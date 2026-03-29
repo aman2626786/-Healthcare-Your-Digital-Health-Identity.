@@ -325,6 +325,14 @@ def init_db():
         )
         print("[OK] Created/verified users table")
 
+        # Migrations for users table
+        try:
+            cur.execute('ALTER TABLE users ADD COLUMN emergency_contact_name TEXT')
+            conn.commit()
+            print("[OK] Migrated users table: added emergency_contact_name")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
         # Medical records (per consultation)
         cur.execute(
             '''CREATE TABLE IF NOT EXISTS records (
@@ -1867,10 +1875,63 @@ def generate_health_qr(health_id):
     qr_path = os.path.join(QR_FOLDER, f"{health_id}.png")
     if not QRCODE_AVAILABLE:
         return None
-    if not os.path.exists(qr_path):
-        img = qrcode.make(health_id)
-        img.save(qr_path)
+    # Ensure QR encodes the scan URL, forcing regeneration for new format
+    scan_url = url_for('scan_qr', health_id=health_id, _external=True)
+    img = qrcode.make(scan_url)
+    img.save(qr_path)
     return f"qr/{health_id}.png"
+
+
+@app.route('/scan/<health_id>')
+def scan_qr(health_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM users WHERE health_id = ?', (health_id,))
+    patient = cur.fetchone()
+    conn.close()
+    
+    if not patient:
+        flash('Invalid QR Code or Patient not found.', 'danger')
+        return redirect(url_for('index'))
+        
+    role = current_role()
+    if role == 'doctor':
+        return redirect(url_for('doctor_scan_result', health_id=health_id))
+    
+    # Public view
+    return render_template('public_emergency_card.html', patient=patient)
+
+@app.route('/doctor/scan_result/<health_id>')
+def doctor_scan_result(health_id):
+    if current_role() != 'doctor':
+        flash('Unauthorized', 'danger')
+        return redirect(url_for('index'))
+        
+    doctor_id = current_user_id()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM users WHERE health_id = ?', (health_id,))
+    patient = cur.fetchone()
+    
+    records = []
+    if patient:
+        cur.execute(
+            '''SELECT r.*, d.id as doctor_id, d.name as doctor_name, d.specialization as doctor_specialization,
+                      h.id as hospital_id, h.name as hospital_name, h.reg_no as hospital_reg_no
+               FROM records r
+               JOIN doctors d ON r.doctor_id = d.id
+               JOIN hospitals h ON d.hospital_id = h.id
+               WHERE r.user_id = ?
+               ORDER BY r.date DESC''',
+            (patient['id'],),
+        )
+        records = cur.fetchall()
+    
+    # Needs to match the context expected by doctor_dashboard.html
+    # Some counters are skipped here for brevity, but dashboard handles missing vars fine.
+    
+    conn.close()
+    return render_template('doctor_dashboard.html', patient=patient, records=records, search_health_id=health_id, doctor_id=doctor_id, current_user_id=doctor_id)
 
 
 # Health Risk Prediction Function
@@ -5304,6 +5365,9 @@ def user_register():
         age_raw = request.form.get('age', '').strip()
         phone = request.form['phone']
         address = request.form['address']
+        blood_group = request.form.get('blood_group', '').strip()
+        emergency_contact = request.form.get('emergency_contact', '').strip()
+        emergency_contact_name = request.form.get('emergency_contact_name', '').strip()
 
         # Basic numeric validation for age
         age = int(age_raw) if age_raw.isdigit() else None
@@ -5314,9 +5378,9 @@ def user_register():
         cur = conn.cursor()
         try:
             cur.execute(
-                '''INSERT INTO users (name, email, password, phone, address, health_id, age)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                (name, email, password, phone, address, health_id, age),
+                '''INSERT INTO users (name, email, password, phone, address, health_id, age, blood_group, emergency_contact, emergency_contact_name)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (name, email, password, phone, address, health_id, age, blood_group, emergency_contact, emergency_contact_name),
             )
             conn.commit()
             user_id = cur.lastrowid
@@ -5543,6 +5607,9 @@ def user_profile():
         address = request.form.get('address', '').strip()
         age_raw = request.form.get('age', '').strip()
         gender = request.form.get('gender', '').strip() or None
+        blood_group = request.form.get('blood_group', '').strip() or None
+        emergency_contact = request.form.get('emergency_contact', '').strip() or None
+        emergency_contact_name = request.form.get('emergency_contact_name', '').strip() or None
         
         age = int(age_raw) if age_raw and age_raw.isdigit() else None
         
@@ -5560,9 +5627,9 @@ def user_profile():
         try:
             cur.execute('''
                 UPDATE users 
-                SET name = ?, email = ?, phone = ?, address = ?, age = ?, gender = ?
+                SET name = ?, email = ?, phone = ?, address = ?, age = ?, gender = ?, blood_group = ?, emergency_contact = ?, emergency_contact_name = ?
                 WHERE id = ?
-            ''', (name, email, phone, address, age, gender, user_id))
+            ''', (name, email, phone, address, age, gender, blood_group, emergency_contact, emergency_contact_name, user_id))
             conn.commit()
             flash('Profile updated successfully', 'success')
             conn.close()
@@ -5668,6 +5735,14 @@ def user_dashboard():
         hospitals=hospitals,
         qr_path=qr_rel_path,
     )
+
+
+@app.route('/user/scanner')
+def user_scanner():
+    if current_role() != 'user':
+        flash('Unauthorized', 'danger')
+        return redirect(url_for('index'))
+    return render_template('user_scanner.html')
 
 
 @app.route('/user/records/export/csv')
@@ -6384,4 +6459,4 @@ if __name__ == '__main__':
         raise SystemExit(0)
 
     init_db()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5001, ssl_context='adhoc', debug=True)

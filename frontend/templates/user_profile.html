@@ -47,6 +47,34 @@
                     <option value="Other" {% if user['gender'] == 'Other' %}selected{% endif %}>Other</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label for="blood_group">Blood Group</label>
+                <select id="blood_group" name="blood_group">
+                    <option value="">Select</option>
+                    {% for bg in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] %}
+                    <option value="{{ bg }}" {% if user['blood_group'] == bg %}selected{% endif %}>{{ bg }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); padding: 1.5rem; border-radius: 8px; margin-top: 1rem;">
+            <h3 style="margin: 0 0 0.5rem; color: var(--danger); font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                🚑 Emergency Scan Details
+            </h3>
+            <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 1.2rem;">This information will be displayed to anyone who scans your QR code requesting help.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="emergency_contact_name">Relative/Contact Name</label>
+                    <input type="text" id="emergency_contact_name" name="emergency_contact_name" placeholder="e.g. Ramesh Singh (Father)" value="{{ user['emergency_contact_name'] or '' }}">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="emergency_contact">Relative Phone Number</label>
+                    <input type="tel" id="emergency_contact" name="emergency_contact" placeholder="+91 9876543210" value="{{ user['emergency_contact'] or '' }}">
+                </div>
+            </div>
         </div>
         
         <div class="form-group" style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-top: 1rem;">

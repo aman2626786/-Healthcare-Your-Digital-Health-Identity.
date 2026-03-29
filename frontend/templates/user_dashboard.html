@@ -9,6 +9,7 @@
     <div class="page-header-actions">
         <a href="{{ url_for('user_profile') }}" class="btn small">👤 Profile</a>
         <a href="{{ url_for('emergency') }}" class="btn danger small">🚑 Emergency</a>
+        <a href="{{ url_for('user_scanner') }}" class="btn primary small" style="background: linear-gradient(135deg, var(--primary), #3b82f6); border: none;">📷 Scan QR</a>
         <a href="{{ url_for('user_records_export_csv') }}" class="btn small">Export Records</a>
         <a href="{{ url_for('user_emergencies_export_csv') }}" class="btn small">Export Emergencies</a>
         <a href="{{ url_for('user_logout') }}" class="btn small">Logout</a>
