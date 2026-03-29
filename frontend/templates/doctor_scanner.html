@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% block title %}Doctor QR Scanner{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Doctor QR Scanner</h1>
+        <p class="help-text">Scan patient QR or enter ABHA/Health ID to load full patient profile and complete medical records.</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('doctor_dashboard') }}" class="btn small">Back to Dashboard</a>
+    </div>
+</div>
+
+<div class="card form-card" style="max-width: 640px; margin: 0 auto 1rem auto;">
+    <form id="manual-health-id-form" class="form-group inline" style="margin: 0; gap: 0.75rem;">
+        <input type="text" id="manual-health-id" placeholder="Enter ABHA / Health ID (e.g. H-1234-ABCD)" required style="flex: 1;">
+        <button type="submit" class="btn primary">Fetch Patient</button>
+    </form>
+    <p class="help-text" style="margin-top: 0.5rem;">Tip: QR scan and manual ID both open complete patient history for doctor access.</p>
+</div>
+
+<div class="card glass scanner-container">
+    <div id="reader"></div>
+    <div id="scanner-status">
+        <div class="spinner"></div> Requesting camera permission...
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const statusEl = document.getElementById('scanner-status');
+    const readerEl = document.getElementById('reader');
+    const manualForm = document.getElementById('manual-health-id-form');
+    const manualInput = document.getElementById('manual-health-id');
+    statusEl.innerHTML = "<div class='spinner'></div> Requesting secure camera access...";
+
+    manualForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const healthId = (manualInput.value || '').trim();
+        if (!healthId) return;
+        window.location.href = "/scan/" + encodeURIComponent(healthId);
+    });
+
+    const html5QrCode = new Html5Qrcode("reader");
+    let currentFacingMode = "environment";
+
+    const config = {
+        fps: 10,
+        qrbox: {width: 250, height: 250},
+        aspectRatio: 1.0
+    };
+
+    function onScanSuccess(decodedText) {
+        statusEl.innerHTML = "Scanning successful! Redirecting...";
+        statusEl.style.color = "var(--success)";
+        statusEl.style.fontWeight = "bold";
+        readerEl.style.border = "2px solid var(--success)";
+        readerEl.style.boxShadow = "0 0 20px rgba(34, 197, 94, 0.4)";
+
+        html5QrCode.stop().then(() => {
+            if (decodedText.includes('/scan/')) {
+                window.location.href = decodedText;
+            } else {
+                window.location.href = "/scan/" + encodeURIComponent(decodedText.trim());
+            }
+        }).catch(() => {
+            if (decodedText.includes('/scan/')) {
+                window.location.href = decodedText;
+            } else {
+                window.location.href = "/scan/" + encodeURIComponent(decodedText.trim());
+            }
+        });
+    }
+
+    function startScan(facingMode) {
+        html5QrCode.start({ facingMode: facingMode }, config, onScanSuccess)
+        .then(() => {
+            currentFacingMode = facingMode;
+
+            if (!document.getElementById("btn-switch-cam")) {
+                const switchBtn = document.createElement("button");
+                switchBtn.id = "btn-switch-cam";
+                switchBtn.className = "btn small primary";
+                switchBtn.style.marginTop = "15px";
+                switchBtn.textContent = "Switch to " + (facingMode === "environment" ? "Front" : "Back") + " Camera";
+
+                switchBtn.onclick = function() {
+                    const nextMode = (currentFacingMode === "environment") ? "user" : "environment";
+                    html5QrCode.stop().then(() => {
+                        startScan(nextMode);
+                    });
+                };
+
+                document.querySelector('.scanner-container').insertBefore(switchBtn, statusEl.nextSibling);
+            } else {
+                document.getElementById("btn-switch-cam").textContent =
+                    "Switch to " + (facingMode === "environment" ? "Front" : "Back") + " Camera";
+            }
+
+            statusEl.textContent = "Camera ready (" + (facingMode === "environment" ? "Back" : "Front") + "). Point at a patient Health QR code.";
+        })
+        .catch(() => {
+            if (facingMode === "environment") {
+                statusEl.textContent = "Back camera not available. Trying front camera...";
+                startScan("user");
+            } else {
+                statusEl.textContent = "Camera access failed. Allow camera permission and use HTTPS.";
+                statusEl.style.color = "var(--danger)";
+            }
+        });
+    }
+
+    startScan("environment");
+});
+</script>
+
+<style>
+.scanner-container {
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: center;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#reader {
+    width: 100%;
+    min-height: 300px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 2px solid var(--border);
+    transition: all 0.3s ease;
+}
+
+#scanner-status {
+    margin-top: 1.5rem;
+    color: var(--text-light);
+    font-size: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+#reader button {
+    background: linear-gradient(135deg, var(--primary), #3b82f6);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    margin: 8px 4px;
+}
+
+#reader select {
+    padding: 0.6rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-bottom: 15px;
+    background: var(--bg-white);
+    color: var(--text-dark);
+    width: 80%;
+    max-width: 300px;
+}
+
+#reader__dashboard_section_swaplink {
+    display: none !important;
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(59, 130, 246, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--primary);
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}

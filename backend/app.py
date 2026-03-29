@@ -5039,6 +5039,14 @@ def doctor_profile():
     return render_template('doctor_profile.html', doctor=doctor)
 
 
+@app.route('/doctor/scanner')
+def doctor_scanner():
+    if current_role() != 'doctor':
+        flash('Unauthorized', 'danger')
+        return redirect(url_for('index'))
+    return render_template('doctor_scanner.html')
+
+
 @app.route('/doctor/dashboard', methods=['GET', 'POST'])
 def doctor_dashboard():
     if current_role() != 'doctor':
@@ -5086,7 +5094,11 @@ def doctor_dashboard():
     # Handle patient search by Health ID (ABHA-like)
     search_health_id = None
     if request.method == 'POST' and 'search_health_id' in request.form:
-        search_health_id = request.form['search_health_id'].strip()
+        search_health_id = (request.form.get('search_health_id') or '').strip()
+    else:
+        search_health_id = (request.args.get('search_health_id') or '').strip()
+
+    if search_health_id:
         cur.execute('SELECT * FROM users WHERE health_id = ?', (search_health_id,))
         patient = cur.fetchone()
         if patient:
