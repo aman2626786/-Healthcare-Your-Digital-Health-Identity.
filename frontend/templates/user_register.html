@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}User Registration{% endblock %}
+{% block content %}
+<form method="post" class="card form-card narrow">
+    <h1>Create Your Health ID</h1>
+    <p style="color: var(--text-light); margin-bottom: 1.5rem;">Register to get your unique digital health identity</p>
+    <div class="form-group">
+        <label for="name">Full Name</label>
+        <input type="text" id="name" name="name" placeholder="Enter your full name" required>
+    </div>
+    <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" placeholder="your.email@example.com" required>
+    </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Create a strong password" required>
+    </div>
+    <div class="form-group">
+        <label for="age">Age</label>
+        <input type="number" id="age" name="age" min="0" max="120" placeholder="Your age" required>
+    </div>
+    <div class="form-group">
+        <label for="phone">Phone Number</label>
+        <input type="text" id="phone" name="phone" placeholder="10-digit phone number">
+    </div>
+    <div class="form-group">
+        <label for="address">Address</label>
+        <textarea id="address" name="address" rows="2" placeholder="Your residential address"></textarea>
+    </div>
+    <button type="submit" class="btn primary full-width">Register & Generate Health ID</button>
+    <p class="form-footnote">Already have a Health ID? 
+        <a href="{{ url_for('user_login') }}" style="color: var(--primary); font-weight: 600;">Sign in here</a>
+    </p>
+</form>
+{% endblock %}

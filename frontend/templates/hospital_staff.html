@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}Hospital Staff{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>🧑‍💼 Staff Management</h1>
+        <p class="help-text">Create staff accounts who can log in from the Doctor Login page using the Staff toggle.</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('hospital_dashboard') }}" class="btn small">← Back</a>
+    </div>
+</div>
+
+<section class="two-column">
+    <div class="card form-card">
+        <h2>➕ Add Staff Account</h2>
+        <form method="post" action="{{ url_for('hospital_staff_add') }}">
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" placeholder="e.g., Rahul Kumar" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" placeholder="staff@hospital.com" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Temporary Password</label>
+                <input type="text" id="password" name="password" placeholder="Set a temporary password" required>
+            </div>
+            <div class="form-group">
+                <label for="role_title">Role Title</label>
+                <input type="text" id="role_title" name="role_title" placeholder="e.g., Reception, Nurse, Lab Assistant">
+            </div>
+            <button type="submit" class="btn primary full-width">Create Staff Account</button>
+            <p class="form-footnote">Staff can log in via Doctor Login → Staff.</p>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2>📋 Staff List</h2>
+            <span class="badge">{{ staff|length if staff else 0 }}</span>
+        </div>
+
+        {% if staff %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in staff %}
+                    <tr>
+                        <td><strong>{{ s['name'] }}</strong></td>
+                        <td>{{ s['email'] }}</td>
+                        <td>{{ s['role_title'] or '-' }}</td>
+                        <td>
+                            <form method="post" action="{{ url_for('hospital_staff_delete', staff_id=s['id']) }}" onsubmit="return confirm('Delete this staff account?');">
+                                <button type="submit" class="btn small" style="background:#fee2e2;color:#b91c1c;border-color:#fecaca;">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No staff accounts created yet.</p>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Staff Panel{% endblock %}
+{% block content %}
+<div class="staff-app">
+  <aside class="staff-sidebar">
+    <div class="staff-sidebar-header">
+      <div style="font-weight:900; letter-spacing:-0.02em;">Staff Panel</div>
+      {% if staff %}
+      <div class="help-text" style="margin-top:0.25rem;">{{ staff['hospital_name'] }}</div>
+      {% endif %}
+    </div>
+
+    <nav class="staff-nav">
+      <a class="staff-nav-link {% if active_page == 'home' %}active{% endif %}" href="{{ url_for('staff_home') }}">Overview</a>
+      <a class="staff-nav-link {% if active_page == 'patients' %}active{% endif %}" href="{{ url_for('staff_patients') }}">Patients</a>
+      <a class="staff-nav-link {% if active_page == 'beds' %}active{% endif %}" href="{{ url_for('staff_beds') }}">Beds</a>
+      <a class="staff-nav-link {% if active_page == 'inventory' %}active{% endif %}" href="{{ url_for('staff_inventory') }}">Inventory</a>
+      <a class="staff-nav-link {% if active_page == 'medicines' %}active{% endif %}" href="{{ url_for('staff_medicines') }}">Medicines</a>
+      <a class="staff-nav-link {% if active_page == 'reports' %}active{% endif %}" href="{{ url_for('staff_reports') }}">Reports</a>
+      <a class="staff-nav-link {% if active_page == 'emergencies' %}active{% endif %}" href="{{ url_for('staff_emergencies') }}">
+        Emergencies
+        {% if unseen_emergencies and unseen_emergencies > 0 %}
+          <span class="badge" style="margin-left:0.35rem; background:#fee2e2;color:#991b1b;">{{ unseen_emergencies }}</span>
+        {% endif %}
+      </a>
+      <a class="staff-nav-link {% if active_page == 'logs' %}active{% endif %}" href="{{ url_for('staff_logs') }}">Logs</a>
+      <a class="staff-nav-link {% if active_page == 'settings' %}active{% endif %}" href="{{ url_for('staff_settings') }}">Settings</a>
+    </nav>
+  </aside>
+
+  <main class="staff-main">
+    <div class="staff-topbar">
+      <div class="staff-topbar-title">{% block staff_page_title %}Staff Panel{% endblock %}</div>
+      <div class="staff-topbar-right">
+        {% if staff %}
+        <span class="staff-topbar-pill">{{ staff['name'] }}</span>
+        {% if staff['role_title'] %}
+        <span class="staff-topbar-pill">{{ staff['role_title'] }}</span>
+        {% endif %}
+        {% endif %}
+        <a class="btn small" href="{{ url_for('staff_logout') }}">Logout</a>
+      </div>
+    </div>
+
+    <div class="staff-content">
+      {% block staff_content %}{% endblock %}
+    </div>
+  </main>
+</div>
+{% endblock %}

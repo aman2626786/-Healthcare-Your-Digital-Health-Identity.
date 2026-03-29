@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}Emergency Request{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>🚑 Emergency Ambulance Request</h1>
+</div>
+
+<div class="form-card narrow">
+    <form method="post" class="card form-card">
+        <p class="help-text" style="color: var(--danger); font-weight: 600; margin-bottom: 1rem;">⚠️ This form will dispatch an ambulance to your location. Fill in your details quickly.</p>
+        
+        <div class="form-group">
+            <label for="location">Current Location / Landmark <span style="color: var(--danger);">*</span></label>
+            <textarea id="location" name="location" rows="2" required placeholder="e.g., Near City Mall, Gate 2, Bengaluru"></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="symptoms">Symptoms / Emergency Description <span style="color: var(--danger);">*</span></label>
+            <textarea id="symptoms" name="symptoms" rows="3" required placeholder="Describe the symptoms or emergency situation (e.g., chest pain, difficulty breathing, accident, etc.)"></textarea>
+            <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">AI will analyze this to determine priority level</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="emergency_type">Emergency Type <span style="color: var(--danger);">*</span></label>
+            <select id="emergency_type" name="emergency_type" required>
+                <option value="">Select Emergency Type</option>
+                <option value="EMS">EMS (Medical Emergency)</option>
+                <option value="Traffic">Traffic Accident</option>
+                <option value="Fire">Fire Emergency</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="district">District / City</label>
+            <input type="text" id="district" name="district" placeholder="e.g., Jaipur, Bengaluru Urban">
+            <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">Helps assign the nearest available hospital.</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="state">State <span style="color: var(--danger);">*</span></label>
+            <select id="state" name="state" required>
+                <option value="">Select State</option>
+                <option value="All India">All India</option>
+                <option value="Uttar Pradesh">Uttar Pradesh</option>
+                <option value="Maharashtra">Maharashtra</option>
+                <option value="West Bengal">West Bengal</option>
+                <option value="Jharkhand">Jharkhand</option>
+                <option value="Madhya Pradesh">Madhya Pradesh</option>
+                <option value="Bihar">Bihar</option>
+                <option value="Rajasthan">Rajasthan</option>
+                <option value="Tamil Nadu">Tamil Nadu</option>
+                <option value="Orissa">Orissa</option>
+                <option value="Assam">Assam</option>
+                <option value="Karnataka">Karnataka</option>
+                <option value="Andhra Pradesh">Andhra Pradesh</option>
+                <option value="Haryana">Haryana</option>
+                <option value="Chhatisgarh">Chhatisgarh</option>
+                <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+                <option value="Telangana">Telangana</option>
+                <option value="Uttarakhand">Uttarakhand</option>
+                <option value="Himachal Pradesh">Himachal Pradesh</option>
+                <option value="Gujarat">Gujarat</option>
+                <option value="Kerala">Kerala</option>
+                <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+                <option value="Delhi">Delhi</option>
+                <option value="Nagaland">Nagaland</option>
+                <option value="Mizoram">Mizoram</option>
+                <option value="Meghalaya">Meghalaya</option>
+                <option value="Tripura">Tripura</option>
+                <option value="Manipur">Manipur</option>
+                <option value="Goa">Goa</option>
+                <option value="Andaman and Nicobar Island">Andaman and Nicobar Island</option>
+                <option value="Ladakh">Ladakh</option>
+                <option value="Sikkim">Sikkim</option>
+                <option value="Puducherry">Puducherry</option>
+                <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
+                <option value="Chandigarh">Chandigarh</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="zone">Zone <span style="color: var(--danger);">*</span></label>
+            <select id="zone" name="zone" required>
+                <option value="">Select Zone</option>
+                <option value="Urban">Urban</option>
+                <option value="Rural">Rural</option>
+                <option value="Highway">Highway</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="day">Day</label>
+            <select id="day" name="day">
+                <option value="">Auto-detect (Current Day)</option>
+                <option value="Monday">Monday</option>
+                <option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option>
+                <option value="Thursday">Thursday</option>
+                <option value="Friday">Friday</option>
+                <option value="Saturday">Saturday</option>
+                <option value="Sunday">Sunday</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="time_slot">Time Slot</label>
+            <select id="time_slot" name="time_slot">
+                <option value="">Auto-detect (Current Time)</option>
+                <option value="Morning">Morning</option>
+                <option value="Afternoon">Afternoon</option>
+                <option value="Evening">Evening</option>
+                <option value="Night">Night</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="weather">Weather Condition</label>
+            <select id="weather" name="weather">
+                <option value="">Select Weather</option>
+                <option value="Clear">Clear</option>
+                <option value="Rain">Rain</option>
+                <option value="Fog">Fog</option>
+                <option value="Heatwave">Heatwave</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="name">Patient Name</label>
+            <input type="text" id="name" name="name" placeholder="Your name or patient name">
+        </div>
+        
+        <div class="form-group">
+            <label for="age">Patient Age</label>
+            <input type="number" id="age" name="age" min="0" max="120" placeholder="Age (optional, helps AI assess priority)">
+        </div>
+        
+        <div class="form-group">
+            <label for="phone">Contact Phone <span style="color: var(--danger);">*</span></label>
+            <input type="text" id="phone" name="phone" required placeholder="10-digit phone number">
+        </div>
+        
+        <button type="submit" class="btn danger full-width">🚑 Request Ambulance Now</button>
+    </form>
+</div>
+{% endblock %}

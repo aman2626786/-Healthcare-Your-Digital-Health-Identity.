@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Update Profile{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>👤 Update Profile</h1>
+        <p class="help-text">Update your personal information</p>
+    </div>
+    <a href="{{ url_for('user_dashboard') }}" class="btn small">← Back to Dashboard</a>
+</div>
+
+<div class="form-card">
+    <form method="post" class="card form-card">
+        <div class="form-group">
+            <label for="name">Full Name</label>
+            <input type="text" id="name" name="name" required placeholder="Enter your full name" value="{{ user['name'] or '' }}">
+        </div>
+        
+        <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" required placeholder="your.email@example.com" value="{{ user['email'] or '' }}">
+        </div>
+        
+        <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" name="phone" placeholder="e.g. 916377429064" value="{{ user['phone'] or '' }}">
+            <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">Required for OTP login and emergency contacts</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="address">Address</label>
+            <textarea id="address" name="address" rows="3" placeholder="Your residential address">{{ user['address'] or '' }}</textarea>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+                <label for="age">Age</label>
+                <input type="number" id="age" name="age" min="0" max="120" placeholder="Your age" value="{{ user['age'] or '' }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="gender">Gender</label>
+                <select id="gender" name="gender">
+                    <option value="">Select Gender</option>
+                    <option value="Male" {% if user['gender'] == 'Male' %}selected{% endif %}>Male</option>
+                    <option value="Female" {% if user['gender'] == 'Female' %}selected{% endif %}>Female</option>
+                    <option value="Other" {% if user['gender'] == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group" style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+            <label style="color: var(--text-light); font-size: 0.9rem;">Health ID</label>
+            <p style="font-weight: 600; font-size: 1.1rem; margin-top: 0.5rem;">{{ user['health_id'] }}</p>
+            <small style="color: var(--text-light);">Health ID cannot be changed</small>
+        </div>
+        
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn primary">Update Profile</button>
+            <a href="{{ url_for('user_dashboard') }}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

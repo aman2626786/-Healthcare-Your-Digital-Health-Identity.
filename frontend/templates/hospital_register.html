@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Hospital Registration{% endblock %}
+{% block content %}
+<form method="post" class="card form-card narrow">
+    <h1>Hospital Registration</h1>
+    <p style="color: var(--text-light); margin-bottom: 1.5rem;">Register your hospital to manage doctors and patient records</p>
+    <div class="form-group">
+        <label for="name">Hospital Name</label>
+        <input type="text" id="name" name="name" placeholder="Enter hospital name" required>
+    </div>
+    <div class="form-group">
+        <label for="reg_no">Registration Number</label>
+        <input type="text" id="reg_no" name="reg_no" placeholder="Official registration number" required>
+    </div>
+    <div class="form-group">
+        <label for="email">Official Email</label>
+        <input type="email" id="email" name="email" placeholder="admin@hospital.com" required>
+    </div>
+    <div class="form-group">
+        <label for="state">State / UT</label>
+        <select id="state" name="state" required>
+            <option value="">Select state / UT</option>
+            <option value="Andhra Pradesh">Andhra Pradesh</option>
+            <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+            <option value="Assam">Assam</option>
+            <option value="Bihar">Bihar</option>
+            <option value="Chhattisgarh">Chhattisgarh</option>
+            <option value="Goa">Goa</option>
+            <option value="Gujarat">Gujarat</option>
+            <option value="Haryana">Haryana</option>
+            <option value="Himachal Pradesh">Himachal Pradesh</option>
+            <option value="Jharkhand">Jharkhand</option>
+            <option value="Karnataka">Karnataka</option>
+            <option value="Kerala">Kerala</option>
+            <option value="Madhya Pradesh">Madhya Pradesh</option>
+            <option value="Maharashtra">Maharashtra</option>
+            <option value="Manipur">Manipur</option>
+            <option value="Meghalaya">Meghalaya</option>
+            <option value="Mizoram">Mizoram</option>
+            <option value="Nagaland">Nagaland</option>
+            <option value="Odisha">Odisha</option>
+            <option value="Punjab">Punjab</option>
+            <option value="Rajasthan">Rajasthan</option>
+            <option value="Sikkim">Sikkim</option>
+            <option value="Tamil Nadu">Tamil Nadu</option>
+            <option value="Telangana">Telangana</option>
+            <option value="Tripura">Tripura</option>
+            <option value="Uttar Pradesh">Uttar Pradesh</option>
+            <option value="Uttarakhand">Uttarakhand</option>
+            <option value="West Bengal">West Bengal</option>
+            <option value="Andaman and Nicobar Islands">Andaman and Nicobar Islands</option>
+            <option value="Chandigarh">Chandigarh</option>
+            <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
+            <option value="Delhi">Delhi</option>
+            <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+            <option value="Ladakh">Ladakh</option>
+            <option value="Lakshadweep">Lakshadweep</option>
+            <option value="Puducherry">Puducherry</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="district">District</label>
+        <input type="text" id="district" name="district" required placeholder="Enter district name">
+    </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required placeholder="Create a strong password">
+    </div>
+    <button type="submit" class="btn primary full-width">Register Hospital</button>
+    <p class="form-footnote">Already registered? 
+        <a href="{{ url_for('hospital_login') }}" style="color: var(--primary); font-weight: 600;">Sign in here</a>
+    </p>
+</form>
+{% endblock %}

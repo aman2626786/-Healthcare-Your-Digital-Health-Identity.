@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block title %}Staff Uploads{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>📤 Upload Reports</h1>
+        <p class="help-text">Attach Blood Report / Prescription files to the <strong>latest medical record</strong> (for your hospital).</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('staff_dashboard') }}" class="btn small">← Back</a>
+        <a href="{{ url_for('staff_logout') }}" class="btn small">Logout</a>
+    </div>
+</div>
+
+<section class="card form-card">
+    <div class="section-header">
+        <h2>Search Patient</h2>
+        <span class="badge">Health ID</span>
+    </div>
+    <form method="post">
+        <input type="hidden" name="action" value="search">
+        <div class="form-group inline" style="gap: 1rem;">
+            <input type="text" name="search_health_id" placeholder="e.g. H-1234-ABCD" value="{{ search_health_id or '' }}" required style="flex: 1;">
+            <button type="submit" class="btn primary">Search</button>
+        </div>
+    </form>
+</section>
+
+{% if patient %}
+<section class="two-column mt-lg">
+    <div class="card">
+        <div class="section-header">
+            <h2>Patient</h2>
+        </div>
+        <div style="display: grid; gap: 0.75rem;">
+            <div>
+                <div class="help-text">Name</div>
+                <div style="font-weight: 700;">{{ patient['name'] }}</div>
+            </div>
+            <div>
+                <div class="help-text">Health ID</div>
+                <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight: 700;">{{ patient['health_id'] }}</div>
+            </div>
+            <div>
+                <div class="help-text">Email</div>
+                <div style="font-weight: 600;">{{ patient['email'] }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card form-card">
+        <div class="section-header">
+            <h2>Latest Record</h2>
+            {% if latest_record %}
+                <span class="badge">{{ latest_record['date'] }}</span>
+            {% else %}
+                <span class="badge" style="background:#fffbeb;color:#78350f;">No record</span>
+            {% endif %}
+        </div>
+
+        {% if latest_record %}
+        <div class="help-text" style="margin-bottom: 1rem;">
+            This will update the latest record from your hospital only.
+        </div>
+
+        <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="upload">
+            <input type="hidden" name="search_health_id" value="{{ search_health_id }}">
+
+            <div class="form-group">
+                <label for="blood_report_file">📄 Blood Report (PDF/Image)</label>
+                <input type="file" id="blood_report_file" name="blood_report_file" accept=".pdf,.jpg,.jpeg,.png">
+                {% if latest_record['blood_report_filename'] %}
+                    <p class="help-text" style="margin-top:0.35rem;">Current: <a class="link" target="_blank" href="{{ url_for('view_report', filename=latest_record['blood_report_filename']) }}">View Report</a></p>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="prescription_file">📋 Prescription File (optional)</label>
+                <input type="file" id="prescription_file" name="prescription_file" accept=".pdf,.jpg,.jpeg,.png">
+                {% if latest_record['prescription_filename'] %}
+                    <p class="help-text" style="margin-top:0.35rem;">Current: <a class="link" target="_blank" href="{{ url_for('view_report', filename=latest_record['prescription_filename']) }}">View Prescription</a></p>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn primary full-width">Upload to Latest Record</button>
+        </form>
+        {% else %}
+        <p class="help-text">No record found for this patient in your hospital. Ask a doctor to add a medical record first.</p>
+        {% endif %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

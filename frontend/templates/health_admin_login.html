@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Health Organisation Admin Login{% endblock %}
+{% block content %}
+<div class="form-card narrow">
+    <form method="post" class="card form-card">
+        <h1>Health Organisation Admin</h1>
+        <p style="color: var(--text-light); margin-bottom: 1.5rem;">View doctors, patients and coverage across India</p>
+
+        <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" placeholder="admin@health.org" required value="{{ email or (demo.health_admin_email if demo else '') }}">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" placeholder="Enter your password" required value="{{ demo.health_admin_password if demo else '' }}">
+        </div>
+
+        <button type="submit" class="btn primary full-width">Sign In</button>
+
+        <p class="form-footnote" style="margin-top: 1rem;">
+            <a href="{{ url_for('index') }}" style="color: var(--primary); font-weight: 600;">Back to Home</a>
+        </p>
+    </form>
+</div>
+{% endblock %}

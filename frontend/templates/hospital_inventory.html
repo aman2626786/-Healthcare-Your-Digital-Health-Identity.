@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% block title %}Hospital Inventory{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>📦 Inventory</h1>
+        <p class="help-text">Manage medicines, supplies and stock levels for your hospital.</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('hospital_dashboard') }}" class="btn small">← Back</a>
+    </div>
+</div>
+
+<section class="two-column">
+    <div class="card form-card">
+        <h2>➕ Add / Update Item</h2>
+        <form method="post" action="{{ url_for('hospital_inventory_add') }}">
+            <div class="form-group">
+                <label for="item_name">Item Name</label>
+                <input type="text" id="item_name" name="item_name" placeholder="e.g., Paracetamol 500mg" required>
+            </div>
+            <div class="form-group inline">
+                <div style="flex: 1;">
+                    <label for="medicine_type">Medicine Type</label>
+                    <input type="text" id="medicine_type" name="medicine_type" placeholder="e.g., Tablet, Syrup, Injection">
+                </div>
+                <div style="flex: 1;">
+                    <label for="strength_mg">Strength (mg)</label>
+                    <input type="number" id="strength_mg" name="strength_mg" placeholder="e.g., 500" step="0.01">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="category">Category</label>
+                <input type="text" id="category" name="category" placeholder="e.g., Medicine, PPE, Oxygen">
+            </div>
+            <div class="form-group inline">
+                <div style="flex: 1;">
+                    <label for="quantity">Quantity</label>
+                    <input type="number" id="quantity" name="quantity" placeholder="0" value="0">
+                </div>
+                <div style="flex: 1;">
+                    <label for="unit">Unit</label>
+                    <input type="text" id="unit" name="unit" placeholder="e.g., strips, vials, pcs">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="reorder_level">Reorder Level (Low Stock Threshold)</label>
+                <input type="number" id="reorder_level" name="reorder_level" placeholder="0" value="0">
+            </div>
+            <div class="form-group">
+                <label for="notes">Notes</label>
+                <textarea id="notes" name="notes" rows="3" placeholder="Optional notes"></textarea>
+            </div>
+            <button type="submit" class="btn primary full-width">Save Item</button>
+            <p class="form-footnote">If an item with the same name already exists, it will be updated.</p>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2>📋 Current Stock</h2>
+        </div>
+
+        {% if items %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Type</th>
+                        <th>mg</th>
+                        <th>Category</th>
+                        <th>Qty</th>
+                        <th>Unit</th>
+                        <th>Reorder</th>
+                        <th>Last Updated</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for it in items %}
+                    <tr {% if it['quantity'] <= it['reorder_level'] %}style="background: #fffbeb;"{% endif %}>
+                        <td>
+                            <div style="font-weight: 700;">{{ it['item_name'] }}</div>
+                            {% if it['notes'] %}
+                            <div class="help-text">{{ it['notes'] }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ it['medicine_type'] or '-' }}</td>
+                        <td>{{ it['strength_mg'] or '-' }}</td>
+                        <td>{{ it['category'] or '-' }}</td>
+                        <td>
+                            <form method="post" action="{{ url_for('hospital_inventory_update', item_id=it['id']) }}" style="display:flex; gap:0.5rem; align-items:center;">
+                                <input type="number" name="quantity" value="{{ it['quantity'] }}" style="max-width: 90px;">
+                        </td>
+                        <td>
+                                <input type="text" name="unit" value="{{ it['unit'] or '' }}" style="max-width: 90px;">
+                        </td>
+                        <td>
+                                <input type="number" name="reorder_level" value="{{ it['reorder_level'] }}" style="max-width: 90px;">
+                        </td>
+                        <td>
+                                <span class="help-text">{{ it['last_updated'] }}</span>
+                        </td>
+                        <td>
+                                <input type="text" name="category" value="{{ it['category'] or '' }}" style="display:none;">
+                                <input type="text" name="notes" value="{{ it['notes'] or '' }}" style="display:none;">
+                                <input type="text" name="medicine_type" value="{{ it['medicine_type'] or '' }}" style="display:none;">
+                                <input type="text" name="strength_mg" value="{{ it['strength_mg'] or '' }}" style="display:none;">
+                                <button type="submit" class="btn small">Update</button>
+                            </form>
+                            <form method="post" action="{{ url_for('hospital_inventory_delete', item_id=it['id']) }}" style="margin-top:0.5rem;" onsubmit="return confirm('Delete this inventory item?');">
+                                <button type="submit" class="btn small" style="background:#fee2e2;color:#b91c1c;border-color:#fecaca;">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No inventory items added yet.</p>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

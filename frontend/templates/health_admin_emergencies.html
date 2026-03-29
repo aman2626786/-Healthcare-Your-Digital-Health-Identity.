@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}Health Organisation - Emergencies{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>🚑 Emergencies</h1>
+        <p class="help-text">View and assign emergency requests</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('health_admin_dashboard') }}" class="btn small">Back to Dashboard</a>
+        <a href="{{ url_for('health_admin_logout') }}" class="btn small">Logout</a>
+    </div>
+</div>
+
+<div class="card form-card" style="margin-bottom: 1rem;">
+    <form method="get" action="{{ url_for('health_admin_emergencies') }}" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 0.75rem; align-items: end;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="state">State / UT</label>
+            <select id="state" name="state">
+                <option value="">All States</option>
+                {% for s in states %}
+                    <option value="{{ s }}" {% if state == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="district">District</label>
+            <select id="district" name="district">
+                <option value="">All Districts</option>
+                {% for d in districts %}
+                    <option value="{{ d }}" {% if district == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="status">Status</label>
+            <select id="status" name="status">
+                <option value="" {% if not status %}selected{% endif %}>All</option>
+                <option value="Pending" {% if status == 'Pending' %}selected{% endif %}>Pending</option>
+                <option value="Assigned" {% if status == 'Assigned' %}selected{% endif %}>Assigned</option>
+                <option value="Resolved" {% if status == 'Resolved' %}selected{% endif %}>Resolved</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label for="assigned">Assigned?</label>
+            <select id="assigned" name="assigned">
+                <option value="" {% if not assigned %}selected{% endif %}>All</option>
+                <option value="yes" {% if assigned == 'yes' %}selected{% endif %}>Assigned</option>
+                <option value="no" {% if assigned == 'no' %}selected{% endif %}>Unassigned</option>
+            </select>
+        </div>
+        <button type="submit" class="btn primary" style="height: 42px;">Apply</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="section-header">
+        <h2>📋 Emergency Requests</h2>
+    </div>
+
+    {% if emergencies %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Location</th>
+                    <th>State</th>
+                    <th>District</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Requested</th>
+                    <th>Assigned Hospital</th>
+                    <th>Assign</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in emergencies %}
+                <tr id="e-{{ e['id'] }}">
+                    <td>{{ e['id'] }}</td>
+                    <td>{{ e['name'] or '-' }}</td>
+                    <td>{{ e['phone'] or '-' }}</td>
+                    <td>{{ e['location'] or '-' }}</td>
+                    <td>{{ e['state'] or e['hospital_state'] or '-' }}</td>
+                    <td>{{ e['district'] or e['hospital_district'] or '-' }}</td>
+                    <td>{{ e['status'] }}</td>
+                    <td>{{ e['priority'] or '-' }}</td>
+                    <td>{{ e['requested_at'] }}</td>
+                    <td>{{ e['hospital_name'] or '-' }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('health_admin_emergencies_assign') }}" style="display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; align-items: center;">
+                            <input type="hidden" name="emergency_id" value="{{ e['id'] }}">
+                            <select name="hospital_id" style="min-width: 180px;">
+                                <option value="0">Unassigned</option>
+                                {% for h in hospitals %}
+                                    <option value="{{ h['id'] }}" {% if e['hospital_id'] == h['id'] %}selected{% endif %}>{{ h['name'] }}{% if h['district'] %} ({{ h['district'] }}){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn small primary">Save</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No emergencies found for the selected filters.</p>
+    {% endif %}
+</div>
+
+<script>
+  (function () {
+    var stateSel = document.getElementById('state');
+    var districtSel = document.getElementById('district');
+    if (!stateSel || !districtSel) return;
+    stateSel.addEventListener('change', function () {
+      districtSel.value = '';
+    });
+  })();
+</script>
+{% endblock %}

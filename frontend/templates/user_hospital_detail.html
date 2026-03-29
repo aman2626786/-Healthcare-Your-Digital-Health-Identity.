@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% block title %}Hospital Treatments{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>🏥 Treatment at {{ hospital['name'] }}</h1>
+        <p class="help-text">Your medical records and visit history at this hospital</p>
+    </div>
+    <a href="{{ url_for('user_dashboard') }}" class="btn small">← Back to Dashboard</a>
+</div>
+
+{% if records %}
+<section class="grid stats-grid mt-lg">
+    <div class="card stat-card">
+        <div class="stat-label">📋 Total Visits</div>
+        <div class="stat-value" style="color: var(--primary);">{{ records|length }}</div>
+        <p class="help-text stat-subtext">At this hospital</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">✅ Recovered</div>
+        <div class="stat-value" style="color: #10b981;">{{ records|selectattr('treatment_status', 'equalto', 'Recovered')|list|length }}</div>
+        <p class="help-text stat-subtext">Treatment completed</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🔵 Stable</div>
+        <div class="stat-value" style="color: #0ea5e9;">{{ records|selectattr('treatment_status', 'equalto', 'Stable')|list|length }}</div>
+        <p class="help-text stat-subtext">Stable condition</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">⚠️ Under Observation</div>
+        <div class="stat-value" style="color: var(--warning);">{{ records|selectattr('treatment_status', 'equalto', 'Under Observation')|list|length }}</div>
+        <p class="help-text stat-subtext">Active monitoring</p>
+    </div>
+</section>
+
+<section class="card mt-lg">
+    {% set latest = records[0] %}
+    <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.05)); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--primary); margin-bottom: 1.5rem;">
+        <h3 style="margin: 0 0 0.5rem 0; color: var(--primary);">📋 Latest Treatment</h3>
+        <p style="margin: 0; color: var(--text-light); font-size: 0.95rem;">
+            <strong>Date:</strong> {{ latest['date'] }} | 
+            <strong>Doctor:</strong> Dr. {{ latest['doctor_name'] }} ({{ latest['doctor_specialization'] or 'General' }}) |
+            <strong>Hospital ID:</strong> <span style="font-family: monospace; color: var(--primary); font-weight: 600;">{{ hospital['reg_no'] }}</span>
+            {% if latest['treatment_status'] %}
+                | <strong>Status:</strong>
+                {% if latest['treatment_status'] == 'Recovered' %}
+                    <span class="badge" style="background: #ecfdf5; color: #065f46;">✅ Recovered</span>
+                {% elif latest['treatment_status'] == 'Stable' %}
+                    <span class="badge" style="background: #f0f9ff; color: #0c2d6b;">🔵 Stable</span>
+                {% elif latest['treatment_status'] == 'Under Observation' %}
+                    <span class="badge" style="background: #fffbeb; color: #78350f;">⚠️ Under Observation</span>
+                {% else %}
+                    <span class="badge">{{ latest['treatment_status'] }}</span>
+                {% endif %}
+            {% endif %}
+        </p>
+    </div>
+    
+    {% if latest['diagnosis'] %}
+    <div style="padding: 1rem; background: var(--bg-light); border-radius: 0.5rem; margin-bottom: 1rem;">
+        <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem;">Diagnosis</h4>
+        <p style="margin: 0; color: var(--text-dark);">{{ latest['diagnosis'] }}</p>
+    </div>
+    {% endif %}
+</section>
+
+<section class="card mt-lg">
+    <div class="section-header">
+        <h2>📅 All Visits at {{ hospital['name'] }}</h2>
+        <span class="badge">{{ records|length }} visits</span>
+        <div class="section-actions">
+            <a href="{{ url_for('user_hospital_export_csv', hospital_id=hospital['id']) }}" class="btn small">📥 Export CSV</a>
+            <a href="{{ url_for('user_hospital_detail', hospital_id=hospital['id'], print=1) }}" class="btn small" target="_blank">🖨️ Print / PDF</a>
+        </div>
+    </div>
+
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Date</th>
+            <th>Doctor</th>
+            <th>Specialization</th>
+            <th>Hospital ID</th>
+            <th>Diagnosis</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for r in records %}
+        <tr>
+            <td><strong>{{ r['date'] }}</strong></td>
+            <td><strong>Dr. {{ r['doctor_name'] }}</strong></td>
+            <td>{{ r['doctor_specialization'] or '-' }}</td>
+            <td style="font-family: monospace; font-size: 0.9rem; color: var(--primary);">{{ hospital['reg_no'] }}</td>
+            <td>{{ r['diagnosis'][:30] or '-' }}{% if r['diagnosis'] and r['diagnosis']|length > 30 %}...{% endif %}</td>
+            <td>
+                {% if r['treatment_status'] == 'Recovered' %}
+                    <span class="badge" style="background: #ecfdf5; color: #065f46;">✅ Recovered</span>
+                {% elif r['treatment_status'] == 'Stable' %}
+                    <span class="badge" style="background: #f0f9ff; color: #0c2d6b;">🔵 Stable</span>
+                {% elif r['treatment_status'] == 'Under Observation' %}
+                    <span class="badge" style="background: #fffbeb; color: #78350f;">⚠️ Observing</span>
+                {% else %}
+                    <span class="badge">{{ r['treatment_status'] or '-' }}</span>
+                {% endif %}
+            </td>
+            <td>
+                <button type="button" class="btn primary small" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; margin: 0;" data-record-id="{{ r['id'] }}" data-record-date="{{ r['date'] }}" data-record-doctor="{{ r['doctor_name'] }}" data-record-specialization="{{ r['doctor_specialization'] or '' }}" data-record-diagnosis="{{ r['diagnosis'] or '' }}" data-record-medicines="{{ r['medicines'] or '' }}" data-record-dosage="{{ r['dosage'] or '' }}" data-record-status="{{ r['treatment_status'] or '' }}" data-record-symptoms="{{ r['symptoms'] or '' }}" data-record-prescription="{{ r['prescription_text'] or '' }}" data-record-hospital="{{ hospital['name'] }}" data-record-hospital-id="{{ hospital['reg_no'] }}" onclick="return showRecordDetails(this);">👁️ View Details</button>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% else %}
+<section class="card mt-lg" style="text-align: center; padding: 2rem;">
+    <p style="color: var(--text-light); font-size: 1.1rem;">📋 No treatment records found at this hospital</p>
+</section>
+{% endif %}
+
+<div id="recordModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="card" style="max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2>📋 Medical Record Details</h2>
+            <button type="button" onclick="closeRecordModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+        </div>
+        <div id="recordContent" style="display: grid; gap: 1rem;"></div>
+    </div>
+</div>
+
+<script>
+function showRecordDetails(element) {
+    const recordDate = element.getAttribute('data-record-date');
+    const recordDoctor = element.getAttribute('data-record-doctor');
+    const recordSpecialization = element.getAttribute('data-record-specialization');
+    const recordDiagnosis = element.getAttribute('data-record-diagnosis');
+    const recordMedicines = element.getAttribute('data-record-medicines');
+    const recordDosage = element.getAttribute('data-record-dosage');
+    const recordStatus = element.getAttribute('data-record-status');
+    const recordSymptoms = element.getAttribute('data-record-symptoms');
+    const recordPrescription = element.getAttribute('data-record-prescription');
+    const recordHospital = element.getAttribute('data-record-hospital');
+    const recordHospitalId = element.getAttribute('data-record-hospital-id');
+    
+    const content = `
+        <div style="padding: 1rem; background: var(--bg-light); border-radius: 0.5rem;">
+            <p style="margin: 0;"><strong>📅 Date:</strong> ${recordDate}</p>
+            <p style="margin: 0.5rem 0 0 0;"><strong>👨‍⚕️ Doctor:</strong> Dr. ${recordDoctor} (${recordSpecialization || 'General'})</p>
+            <p style="margin: 0.5rem 0 0 0;"><strong>🏥 Hospital:</strong> ${recordHospital}</p>
+            <p style="margin: 0.5rem 0 0 0;"><strong>🆔 Hospital ID:</strong> <span style="font-family: monospace; color: var(--primary);">${recordHospitalId}</span></p>
+        </div>
+        <div>
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">🔍 Symptoms</h3>
+            <p style="color: var(--text-light); margin: 0;">${recordSymptoms || '-'}</p>
+        </div>
+        <div>
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">📋 Diagnosis</h3>
+            <p style="color: var(--text-light); margin: 0;">${recordDiagnosis || '-'}</p>
+        </div>
+        <div>
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">💊 Medicines</h3>
+            <p style="color: var(--text-light); margin: 0;">${recordMedicines || '-'}</p>
+        </div>
+        <div>
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">⏱️ Dosage</h3>
+            <p style="color: var(--text-light); margin: 0;">${recordDosage || '-'}</p>
+        </div>
+        <div>
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">📝 Prescription Notes</h3>
+            <p style="color: var(--text-light); margin: 0;">${recordPrescription || '-'}</p>
+        </div>
+        <div style="padding: 1rem; background: var(--bg-light); border-radius: 0.5rem;">
+            <p style="margin: 0;"><strong>Treatment Status:</strong> 
+                ${recordStatus === 'Recovered' ? '<span style="background: #ecfdf5; color: #065f46; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">✅ Recovered</span>' : 
+                  recordStatus === 'Stable' ? '<span style="background: #f0f9ff; color: #0c2d6b; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">🔵 Stable</span>' : 
+                  recordStatus === 'Under Observation' ? '<span style="background: #fffbeb; color: #78350f; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">⚠️ Under Observation</span>' : 
+                  recordStatus}
+            </p>
+        </div>
+    `;
+    
+    document.getElementById('recordContent').innerHTML = content;
+    document.getElementById('recordModal').style.display = 'flex';
+    return false;
+}
+
+function closeRecordModal() {
+    document.getElementById('recordModal').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Close modal when clicking outside
+    document.getElementById('recordModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeRecordModal();
+        }
+    });
+});
+</script>
+{% endblock %}

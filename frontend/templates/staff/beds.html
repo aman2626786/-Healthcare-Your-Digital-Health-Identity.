@@ -1,0 +1,113 @@
+{% extends 'staff/layout.html' %}
+
+{% block staff_page_title %}Beds{% endblock %}
+
+{% block staff_content %}
+<section class="two-column">
+  <div class="card form-card">
+    <div class="section-header">
+      <h2>Add Bed</h2>
+      <span class="badge">Hospital</span>
+    </div>
+
+    <form method="post">
+      <input type="hidden" name="action" value="add">
+      <div class="form-group">
+        <label for="bed_number">Bed Number</label>
+        <input id="bed_number" name="bed_number" placeholder="e.g., B-101" required>
+      </div>
+      <div class="form-group inline">
+        <div style="flex:1;">
+          <label for="ward">Ward</label>
+          <input id="ward" name="ward" placeholder="e.g., General Ward">
+        </div>
+        <div style="flex:1;">
+          <label for="bed_type">Bed Type</label>
+          <input id="bed_type" name="bed_type" placeholder="e.g., ICU, General">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          <option value="Available">Available</option>
+          <option value="Occupied">Occupied</option>
+          <option value="Maintenance">Maintenance</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="notes">Notes</label>
+        <input id="notes" name="notes" placeholder="Optional notes">
+      </div>
+      <button class="btn primary full-width" type="submit">Add Bed</button>
+      <p class="help-text" style="margin-top:0.5rem;">If a bed is assigned to an active admission, it cannot be deleted.</p>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="section-header">
+      <h2>Bed List</h2>
+      <span class="badge">{{ beds|length if beds else 0 }}</span>
+    </div>
+
+    {% if beds %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Bed</th>
+            <th>Ward</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in beds %}
+          <tr>
+            <td><strong>{{ b['bed_number'] }}</strong></td>
+            <td>{{ b['ward'] or '-' }}</td>
+            <td>{{ b['bed_type'] or '-' }}</td>
+            <td>
+              {% if b['status'] == 'Available' %}
+                <span class="badge" style="background:#ecfdf5;color:#065f46;">Available</span>
+              {% elif b['status'] == 'Occupied' %}
+                <span class="badge" style="background:#fee2e2;color:#b91c1c;">Occupied</span>
+              {% else %}
+                <span class="badge" style="background:#fffbeb;color:#78350f;">{{ b['status'] }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <form method="post" style="display:grid; gap:0.5rem;">
+                <input type="hidden" name="action" value="update">
+                <input type="hidden" name="bed_id" value="{{ b['id'] }}">
+                <div class="form-group inline" style="margin:0; gap:0.5rem;">
+                  <select name="status" style="max-width: 160px;">
+                    <option value="Available" {% if b['status']=='Available' %}selected{% endif %}>Available</option>
+                    <option value="Occupied" {% if b['status']=='Occupied' %}selected{% endif %}>Occupied</option>
+                    <option value="Maintenance" {% if b['status']=='Maintenance' %}selected{% endif %}>Maintenance</option>
+                  </select>
+                  <input type="text" name="ward" value="{{ b['ward'] or '' }}" placeholder="Ward" style="max-width: 160px;">
+                  <input type="text" name="bed_type" value="{{ b['bed_type'] or '' }}" placeholder="Type" style="max-width: 160px;">
+                </div>
+                <input type="text" name="notes" value="{{ b['notes'] or '' }}" placeholder="Notes">
+                <div class="button-row" style="margin-top:0;">
+                  <button class="btn small" type="submit">Update</button>
+                </div>
+              </form>
+              <form method="post" onsubmit="return confirm('Delete this bed?');" style="margin-top:0.5rem;">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="bed_id" value="{{ b['id'] }}">
+                <button type="submit" class="btn small" style="background:#fee2e2;color:#b91c1c;border-color:#fecaca;">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="help-text">No beds added yet.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

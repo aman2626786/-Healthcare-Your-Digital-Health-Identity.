@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+{% block title %}Hospital Detail{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>🏥 {{ hospital['name'] }}</h1>
+        <p class="help-text">Reg No: {{ hospital['reg_no'] }} | {{ hospital['state'] or '-' }}, {{ hospital['district'] or '-' }}</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('health_admin_dashboard', state=hospital['state'], district=hospital['district']) }}" class="btn small">Back to Dashboard</a>
+        <a href="{{ url_for('health_admin_emergencies', state=hospital['state'], district=hospital['district']) }}" class="btn small">Emergencies</a>
+        <a href="{{ url_for('health_admin_logout') }}" class="btn small">Logout</a>
+    </div>
+</div>
+
+<section class="grid stats-grid">
+    <div class="card stat-card">
+        <div class="stat-label">👨‍⚕️ Doctors</div>
+        <div class="stat-value">{{ doctors|length }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">👥 Treated Patients</div>
+        <div class="stat-value">{{ patients|length }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🛏️ Beds</div>
+        <div class="stat-value">{{ beds|length }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🏥 Admissions</div>
+        <div class="stat-value">{{ admissions|length }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">📦 Low Stock Items</div>
+        <div class="stat-value">{{ low_stock_items|length }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🚑 Recent Emergencies</div>
+        <div class="stat-value">{{ recent_emergencies|length }}</div>
+    </div>
+</section>
+
+<section class="two-column mt-lg">
+    <div class="card">
+        <div class="section-header">
+            <h2>👨‍⚕️ Doctors</h2>
+        </div>
+        {% if doctors %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Specialization</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in doctors %}
+                    <tr>
+                        <td>{{ d['name'] }}</td>
+                        <td>{{ d['email'] }}</td>
+                        <td>{{ d['specialization'] or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No doctors found.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2>👥 Treated Patients</h2>
+        </div>
+        {% if patients %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Health ID</th>
+                        <th>Phone</th>
+                        <th>Visits</th>
+                        <th>Last Visit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in patients %}
+                    <tr>
+                        <td>{{ p['name'] }}</td>
+                        <td>{{ p['health_id'] }}</td>
+                        <td>{{ p['phone'] or '-' }}</td>
+                        <td>{{ p['visits'] }}</td>
+                        <td>{{ p['last_visit'] or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No treated patients found.</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="two-column mt-lg">
+    <div class="card">
+        <div class="section-header">
+            <h2>🛏️ Beds</h2>
+        </div>
+        {% if beds %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Bed</th>
+                        <th>Ward</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in beds %}
+                    <tr>
+                        <td>{{ b['bed_number'] }}</td>
+                        <td>{{ b['ward'] or '-' }}</td>
+                        <td>{{ b['bed_type'] or '-' }}</td>
+                        <td>{{ b['status'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No bed data available.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2>🏥 Admissions</h2>
+        </div>
+        {% if admissions %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Patient</th>
+                        <th>Health ID</th>
+                        <th>Bed</th>
+                        <th>Status</th>
+                        <th>Admitted</th>
+                        <th>Discharged</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in admissions %}
+                    <tr>
+                        <td>{{ a['patient_name'] }}</td>
+                        <td>{{ a['health_id'] }}</td>
+                        <td>{{ a['bed_number'] or '-' }}</td>
+                        <td>{{ a['status'] }}</td>
+                        <td>{{ a['admitted_at'] }}</td>
+                        <td>{{ a['discharged_at'] or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No admissions data available.</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="two-column mt-lg">
+    <div class="card">
+        <div class="section-header">
+            <h2>📦 Low Stock Alerts</h2>
+        </div>
+        {% if low_stock_items %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>Unit</th>
+                        <th>Reorder Level</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in low_stock_items %}
+                    <tr>
+                        <td>{{ i['item_name'] }}</td>
+                        <td>{{ i['quantity'] }}</td>
+                        <td>{{ i['unit'] or '-' }}</td>
+                        <td>{{ i['reorder_level'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No low stock alerts.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2>🚑 Recent Emergencies</h2>
+        </div>
+        {% if recent_emergencies %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Location</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Requested</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in recent_emergencies %}
+                    <tr>
+                        <td>{{ e['name'] or '-' }}</td>
+                        <td>{{ e['phone'] or '-' }}</td>
+                        <td>{{ e['location'] or '-' }}</td>
+                        <td>{{ e['status'] }}</td>
+                        <td>{{ e['priority'] or '-' }}</td>
+                        <td>{{ e['requested_at'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No recent emergencies.</p>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

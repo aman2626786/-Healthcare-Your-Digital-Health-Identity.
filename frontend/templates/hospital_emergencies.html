@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}Hospital - Emergencies{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>🚑 Hospital Emergencies</h1>
+        <p class="help-text">View assigned emergencies, mark them as seen, and update status/response time</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('hospital_dashboard') }}" class="btn small">Back</a>
+        <a href="{{ url_for('hospital_emergencies_export_csv') }}" class="btn small">Export CSV</a>
+        <a href="{{ url_for('hospital_logout') }}" class="btn small">Logout</a>
+    </div>
+</div>
+
+<div class="card form-card" style="margin-bottom: 1rem;">
+    <form method="get" action="{{ url_for('hospital_emergencies') }}" style="display:grid; grid-template-columns: 1fr 1fr auto; gap: 0.75rem; align-items:end;">
+        <div class="form-group" style="margin-bottom:0;">
+            <label for="status">Status</label>
+            <input id="status" name="status" placeholder="e.g. Ambulance Dispatched" value="{{ status }}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <label for="show">Show</label>
+            <select id="show" name="show">
+                <option value="" {% if not show %}selected{% endif %}>All</option>
+                <option value="unseen" {% if show == 'unseen' %}selected{% endif %}>Unseen only</option>
+            </select>
+        </div>
+        <button class="btn primary" type="submit" style="height:42px;">Apply</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="section-header" style="justify-content: space-between; width:100%;">
+        <h2>📋 Assigned Emergencies</h2>
+        <span class="badge">{{ emergencies|length if emergencies else 0 }}</span>
+    </div>
+
+    {% if emergencies %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Requested</th>
+                    <th>Patient</th>
+                    <th>Location</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Seen</th>
+                    <th>Response Time (mins)</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in emergencies %}
+                <tr id="e-{{ e['id'] }}">
+                    <td>{{ e['id'] }}</td>
+                    <td><span class="help-text">{{ e['requested_at'] }}</span></td>
+                    <td>
+                        <div style="font-weight:800;">{{ e['name'] or '-' }}</div>
+                        <div class="help-text">{{ e['phone'] or '-' }}</div>
+                    </td>
+                    <td>
+                        <div style="font-weight:700;">{{ e['location'] or '-' }}</div>
+                        <div class="help-text">{{ e['district'] or '-' }}, {{ e['state'] or '-' }}</div>
+                    </td>
+                    <td>
+                        {% if e['priority'] %}<span class="badge">{{ e['priority'] }}</span>{% else %}<span class="help-text">-</span>{% endif %}
+                    </td>
+                    <td>{{ e['status'] or '-' }}</td>
+                    <td>{% if e['seen_by_hospital'] %}Yes{% else %}<span class="badge">New</span>{% endif %}</td>
+                    <td>{{ e['response_time_minutes'] if e['response_time_minutes'] is not none else '-' }}</td>
+                    <td>
+                        <div style="display:grid; gap:0.35rem;">
+                            {% if not e['seen_by_hospital'] %}
+                            <form method="post" action="{{ url_for('hospital_emergencies_mark_seen') }}">
+                                <input type="hidden" name="emergency_id" value="{{ e['id'] }}">
+                                <button type="submit" class="btn small">Mark seen</button>
+                            </form>
+                            {% endif %}
+
+                            <form method="post" action="{{ url_for('hospital_emergencies_update') }}">
+                                <input type="hidden" name="emergency_id" value="{{ e['id'] }}">
+                                <input type="text" name="status" placeholder="Update status" value="{{ e['status'] or '' }}" style="margin-bottom:0.35rem;">
+                                <input type="number" name="response_time_minutes" placeholder="Response mins" value="{{ e['response_time_minutes'] if e['response_time_minutes'] is not none else '' }}" style="margin-bottom:0.35rem;">
+                                <button type="submit" class="btn small primary">Save</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="help-text">No emergencies assigned to this hospital.</p>
+    {% endif %}
+</div>
+{% endblock %}

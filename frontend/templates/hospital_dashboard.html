@@ -1,0 +1,438 @@
+{% extends 'base.html' %}
+{% block title %}Hospital Dashboard{% endblock %}
+{% block content %}
+
+<section class="ha-hero">
+    <div>
+        <span class="ha-hero-badge">🏥 Hospital Panel</span>
+        <h1 class="ha-hero-title">Hospital Dashboard</h1>
+        {% if hospital %}
+        <p class="ha-hero-subtitle">📍 {{ hospital['state'] or '-' }}, {{ hospital['district'] or '-' }}</p>
+        {% else %}
+        <p class="ha-hero-subtitle">Manage doctors, emergencies, beds, inventory and staff.</p>
+        {% endif %}
+    </div>
+    <div class="ha-hero-actions">
+        <a href="{{ url_for('hospital_emergencies', show='unseen') }}" class="btn small primary">🚑 Emergencies</a>
+        <a href="{{ url_for('hospital_emergencies_export_csv') }}" class="btn small">Export Emergencies</a>
+        <a href="{{ url_for('hospital_inventory') }}" class="btn small">📦 Inventory</a>
+        <a href="{{ url_for('hospital_staff') }}" class="btn small">🧑‍💼 Staff</a>
+        <a href="#add-doctor" class="btn small">➕ Add Doctor</a>
+        <a href="{{ url_for('hospital_profile') }}" class="btn small">👤 Profile</a>
+        <a href="{{ url_for('hospital_logout') }}" class="btn small">Logout</a>
+    </div>
+</section>
+
+<section class="grid stats-grid">
+    <div class="card stat-card">
+        <div class="stat-label">👨‍⚕️ Doctors</div>
+        <div class="stat-value">{{ doctors_count }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🧑‍💼 Staff</div>
+        <div class="stat-value">{{ staff_count }}</div>
+        <p class="help-text stat-subtext">Manage accounts</p>
+        <a class="link" href="{{ url_for('hospital_staff') }}">Manage staff</a>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">👥 Patients Treated</div>
+        <div class="stat-value">{{ patients_count }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🛏️ Beds</div>
+        <div class="stat-value">{{ beds_total }}</div>
+        <p class="help-text stat-subtext">Available: {{ beds_available }} · Occupied: {{ beds_occupied }}</p>
+        <p class="help-text stat-subtext">Active admissions: {{ active_admissions }}</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">📦 Inventory Items</div>
+        <div class="stat-value">{{ inventory_count }}</div>
+        <p class="help-text stat-subtext">Low stock: {{ low_stock_count }}</p>
+        <a class="link" href="{{ url_for('hospital_inventory') }}">Manage inventory</a>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🚑 Assigned Emergencies</div>
+        <div class="stat-value">{{ assigned_emergency_count }}</div>
+        <p class="help-text stat-subtext">Unseen: {{ unseen_assigned_emergency_count }}</p>
+        <p class="help-text stat-subtext" id="emergency-avg-text">Avg response: {% if emergency_avg_response_minutes %}{{ '%.1f'|format(emergency_avg_response_minutes) }} mins{% else %}-{% endif %}</p>
+        <a class="link" href="{{ url_for('hospital_emergencies') }}">Manage emergencies</a>
+    </div>
+</section>
+
+<section class="ha-charts-grid mt-lg">
+    <div class="card">
+        <div class="section-header">
+            <h2>📊 Emergency Status Breakdown</h2>
+        </div>
+        {% if emergency_status_counts %}
+            <div class="ha-kpi-chart ha-kpi-chart-md">
+                <canvas id="hospitalEmergencyStatusChart" class="ha-chart-canvas"></canvas>
+            </div>
+        {% else %}
+            <div class="ha-chart-wrap ha-chart-wrap-md" style="display:flex; align-items:center; justify-content:center; text-align:center;">
+                <div>
+                    <div style="font-weight:800; margin-bottom:0.25rem;">No emergency data yet</div>
+                    <p class="help-text" style="margin-bottom:0.75rem;">Once emergencies are assigned, this chart will update automatically.</p>
+                    <a class="btn small" href="{{ url_for('hospital_emergencies') }}">Open emergencies</a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    <div class="card">
+        <div class="section-header">
+            <h2>📈 Emergency Priority Breakdown</h2>
+        </div>
+        {% if emergency_priority_counts %}
+            <div class="ha-kpi-chart ha-kpi-chart-md">
+                <canvas id="hospitalEmergencyPriorityChart" class="ha-chart-canvas"></canvas>
+            </div>
+        {% else %}
+            <div class="ha-chart-wrap ha-chart-wrap-md" style="display:flex; align-items:center; justify-content:center; text-align:center;">
+                <div>
+                    <div style="font-weight:800; margin-bottom:0.25rem;">No priority data yet</div>
+                    <p class="help-text" style="margin-bottom:0.75rem;">Priorities will appear when emergencies are assigned.</p>
+                    <a class="btn small" href="{{ url_for('hospital_emergencies') }}">Open emergencies</a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script type="application/json" id="hospitalEmergencyStatusData">{
+  "labels": [{% for r in (emergency_status_counts or []) %}{{ (r['status'] or 'Unknown')|tojson }}{% if not loop.last %},{% endif %}{% endfor %}],
+  "values": [{% for r in (emergency_status_counts or []) %}{{ (r['c'] or 0) }}{% if not loop.last %},{% endif %}{% endfor %}]
+}</script>
+
+<script type="application/json" id="hospitalEmergencyPriorityData">{
+  "labels": [{% for r in (emergency_priority_counts or []) %}{{ (r['priority'] or 'Unknown')|tojson }}{% if not loop.last %},{% endif %}{% endfor %}],
+  "values": [{% for r in (emergency_priority_counts or []) %}{{ (r['c'] or 0) }}{% if not loop.last %},{% endif %}{% endfor %}]
+}</script>
+
+<script>
+  (function () {
+    function readJson(id) {
+      var el = document.getElementById(id);
+      if (!el) return null;
+      try {
+        return JSON.parse(el.textContent || el.innerText || 'null');
+      } catch (e) {
+        return null;
+      }
+    }
+
+    if (!window.Chart) return;
+
+    var status = readJson('hospitalEmergencyStatusData') || { labels: [], values: [] };
+    var priority = readJson('hospitalEmergencyPriorityData') || { labels: [], values: [] };
+
+    var sc = document.getElementById('hospitalEmergencyStatusChart');
+    if (sc && status.labels.length) {
+      new Chart(sc, {
+        type: 'doughnut',
+        data: {
+          labels: status.labels,
+          datasets: [{
+            data: status.values,
+            borderWidth: 0,
+            backgroundColor: [
+              'rgba(37,99,235,0.85)',
+              'rgba(16,185,129,0.85)',
+              'rgba(245,158,11,0.85)',
+              'rgba(239,68,68,0.85)',
+              'rgba(148,163,184,0.9)'
+            ]
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+
+    var pc = document.getElementById('hospitalEmergencyPriorityChart');
+    if (pc && priority.labels.length) {
+      new Chart(pc, {
+        type: 'bar',
+        data: {
+          labels: priority.labels,
+          datasets: [{
+            label: 'Count',
+            data: priority.values,
+            borderRadius: 10,
+            backgroundColor: 'rgba(37, 99, 235, 0.75)'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: 'rgba(226,232,240,0.8)' } }
+          }
+        }
+      });
+    }
+  })();
+</script>
+
+<section class="ha-masonry mt-lg">
+    <div class="card">
+        <div class="section-header">
+            <h2>🚑 Recent Assigned Emergencies</h2>
+            <span class="badge">{{ recent_emergencies|length if recent_emergencies else 0 }}</span>
+        </div>
+        {% if unseen_assigned_emergency_count and unseen_assigned_emergency_count > 0 %}
+            <p class="help-text" style="margin-bottom:0.75rem;">New emergencies assigned to your hospital: <strong>{{ unseen_assigned_emergency_count }}</strong></p>
+        {% endif %}
+
+        {% if recent_emergencies %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Patient</th>
+                        <th>Location</th>
+                        <th>Priority</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for e in recent_emergencies %}
+                    <tr>
+                        <td><span class="help-text">{{ e['requested_at'] }}</span></td>
+                        <td>
+                            <div style="font-weight:800;">{{ e['name'] or '-' }}</div>
+                            <div class="help-text">{{ e['phone'] or '-' }}</div>
+                        </td>
+                        <td>
+                            <div style="font-weight:700;">{{ e['location'] }}</div>
+                            <div class="help-text">{{ e['district'] or '-' }}, {{ e['state'] or '-' }}</div>
+                        </td>
+                        <td>
+                            {% if e['priority'] %}
+                                <span class="badge">{{ e['priority'] }}</span>
+                            {% else %}
+                                <span class="help-text">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a class="btn small" href="{{ url_for('hospital_emergencies') }}#e-{{ e['id'] }}">Open</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p class="help-text" style="margin-bottom:0.75rem;">No emergencies assigned to this hospital yet.</p>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                <a class="btn small" href="{{ url_for('hospital_emergencies') }}">Open emergencies</a>
+                <a class="btn small" href="{{ url_for('hospital_emergencies', show='unseen') }}">Show unseen</a>
+                <a class="btn small" href="{{ url_for('hospital_emergencies_export_csv') }}">Export CSV</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2>📦 Low Stock Items</h2>
+            <span class="badge">{{ low_stock_items|length if low_stock_items else 0 }}</span>
+        </div>
+        {% if low_stock_items %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>Reorder</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for it in low_stock_items %}
+                    <tr style="background:#fffbeb;">
+                        <td><strong>{{ it['item_name'] }}</strong></td>
+                        <td>{{ it['quantity'] }} {{ it['unit'] or '' }}</td>
+                        <td>{{ it['reorder_level'] }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p class="help-text" style="margin-bottom:0.75rem;">No low-stock items.</p>
+            <a class="btn small" href="{{ url_for('hospital_inventory') }}">Open inventory</a>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2>🕒 Recent Staff Activity</h2>
+            <span class="badge">{{ recent_staff_logs|length if recent_staff_logs else 0 }}</span>
+        </div>
+        {% if recent_staff_logs %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Staff</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for l in recent_staff_logs %}
+                    <tr>
+                        <td><span class="help-text">{{ l['created_at'] }}</span></td>
+                        <td><strong>{{ l['staff_name'] }}</strong></td>
+                        <td>
+                            <div style="font-weight:700;">{{ l['action'] }}</div>
+                            <div class="help-text">{{ l['details'] or '-' }}</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p class="help-text" style="margin-bottom:0.75rem;">No recent staff activity.</p>
+            <a class="btn small" href="{{ url_for('hospital_staff') }}">Open staff panel</a>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2>👥 Recent Patients</h2>
+            <span class="badge">{{ patients|length if patients else 0 }}</span>
+        </div>
+        {% if patients %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Health ID</th>
+                        <th>Visits</th>
+                        <th>Last Visit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in patients[:10] %}
+                    <tr>
+                        <td><strong>{{ p['name'] }}</strong></td>
+                        <td><span class="help-text">{{ p['health_id'] }}</span></td>
+                        <td>{{ p['visits'] }}</td>
+                        <td><span class="help-text">{{ p['last_visit'] or '-' }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p class="help-text" style="margin-bottom:0.75rem;">No patients found yet.</p>
+            <p class="help-text" style="margin-bottom:0.75rem;">Patients will appear after doctors create records in this hospital.</p>
+            <a class="btn small" href="#add-doctor">Add a doctor</a>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2>🧾 Recent Records</h2>
+            <span class="badge">{{ records|length if records else 0 }}</span>
+        </div>
+        {% if records %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Patient</th>
+                        <th>Doctor</th>
+                        <th>Diagnosis</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in records[:10] %}
+                    <tr>
+                        <td><span class="help-text">{{ r['date'] }}</span></td>
+                        <td><strong>{{ r['patient_name'] }}</strong></td>
+                        <td>
+                            <div style="font-weight:800;">{{ r['doctor_name'] }}</div>
+                            <div class="help-text">{{ r['doctor_specialization'] or '-' }}</div>
+                        </td>
+                        <td>{{ r['diagnosis'] or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p class="help-text" style="margin-bottom:0.75rem;">No records found yet.</p>
+            <p class="help-text" style="margin-bottom:0.75rem;">Records are created by doctors when treating patients.</p>
+            <a class="btn small" href="#add-doctor">Add a doctor</a>
+        {% endif %}
+    </div>
+
+    <div class="card form-card" id="add-doctor">
+        <h2>➕ Add Doctor Account</h2>
+        <form method="post" action="{{ url_for('add_doctor') }}">
+            <div class="form-group">
+                <label for="name">Doctor Name</label>
+                <input type="text" id="name" name="name" placeholder="Full name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" placeholder="doctor@hospital.com" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Temporary Password</label>
+                <input type="text" id="password" name="password" placeholder="Auto-generated password" required>
+            </div>
+            <div class="form-group">
+                <label for="specialization">Specialization</label>
+                <input type="text" id="specialization" name="specialization" placeholder="e.g., Cardiology, Pediatrics">
+            </div>
+            <button type="submit" class="btn primary full-width">Create Doctor Account</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="section-header">
+            <h2>👨‍⚕️ Doctor List</h2>
+            <div class="form-group inline" style="margin-bottom: 0; max-width: 260px; margin-left: auto;">
+                <input type="text" id="doctor-search" placeholder="Search by name, email, specialization">
+            </div>
+        </div>
+        {% if doctors %}
+        <table class="table" id="hospital-doctor-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Specialization</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for d in doctors %}
+                <tr data-doctor-search="{{ (d['name'] ~ ' ' ~ d['email'] ~ ' ' ~ (d['specialization'] or ''))|lower }}">
+                    <td>{{ d['name'] }}</td>
+                    <td>{{ d['email'] }}</td>
+                    <td>{{ d['specialization'] or '-' }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('delete_doctor', doctor_id=d['id']) }}" class="doctor-delete-form">
+                            <button type="submit" class="btn small" style="background:#fee2e2;color:#b91c1c;border-color:#fecaca;">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No doctors created yet. Use the form to add one.</p>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends 'staff/layout.html' %}
+
+{% block staff_page_title %}Patients{% endblock %}
+
+{% block staff_content %}
+<section class="card form-card">
+  <div class="section-header">
+    <h2>Search Patient</h2>
+    <span class="badge">Health ID</span>
+  </div>
+  <form method="get">
+    <div class="form-group inline" style="gap: 1rem;">
+      <input type="text" name="search_health_id" placeholder="e.g. H-1234-ABCD" value="{{ search_health_id or '' }}" required style="flex: 1;">
+      <button type="submit" class="btn primary">Search</button>
+    </div>
+  </form>
+</section>
+
+{% if patient %}
+<section class="two-column mt-lg">
+  <div class="card">
+    <div class="section-header">
+      <h2>Patient Details</h2>
+      <span class="badge">{{ patient['health_id'] }}</span>
+    </div>
+
+    <div class="staff-kv-grid">
+      <div>
+        <div class="help-text">Name</div>
+        <div class="staff-kv-value">{{ patient['name'] }}</div>
+      </div>
+      <div>
+        <div class="help-text">Age / Gender</div>
+        <div class="staff-kv-value">{{ patient['age'] or '-' }} · {{ patient['gender'] or '-' }}</div>
+      </div>
+      <div>
+        <div class="help-text">Contact</div>
+        <div class="staff-kv-value">{{ patient['phone'] or '-' }}</div>
+      </div>
+      <div>
+        <div class="help-text">Address</div>
+        <div class="staff-kv-value">{{ patient['address'] or '-' }}</div>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 1rem; margin-top: 1rem; background: var(--bg-light); border: 1px solid var(--border);">
+      <div class="section-header" style="margin-bottom: 0.75rem;">
+        <h3 style="margin:0; font-size: 1rem;">Admission & Bed</h3>
+        {% if admission %}
+          <span class="badge" style="background:#ecfdf5;color:#065f46;">Active</span>
+        {% else %}
+          <span class="badge" style="background:#fffbeb;color:#78350f;">Not admitted</span>
+        {% endif %}
+      </div>
+
+      {% if admission %}
+        <div class="help-text">
+          Bed:
+          <strong>{{ admission['bed_number'] or '-' }}</strong>
+          {% if admission['ward'] %} · {{ admission['ward'] }}{% endif %}
+          {% if admission['bed_type'] %} · {{ admission['bed_type'] }}{% endif %}
+        </div>
+        <div class="help-text" style="margin-top:0.35rem;">Admitted at: {{ admission['admitted_at'] }}</div>
+        {% if admission['reason'] %}
+          <div class="help-text" style="margin-top:0.35rem;">Reason: {{ admission['reason'] }}</div>
+        {% endif %}
+
+        <form method="post" action="{{ url_for('staff_patient_discharge') }}" style="margin-top:0.75rem;" onsubmit="return confirm('Discharge this patient?');">
+          <input type="hidden" name="health_id" value="{{ patient['health_id'] }}">
+          <button class="btn" type="submit" style="background:#fee2e2;color:#b91c1c;border-color:#fecaca;">Discharge</button>
+        </form>
+      {% else %}
+        <form method="post" action="{{ url_for('staff_patient_admit') }}">
+          <input type="hidden" name="health_id" value="{{ patient['health_id'] }}">
+          <div class="form-group">
+            <label for="bed_id">Assign Bed (optional)</label>
+            <select id="bed_id" name="bed_id">
+              <option value="">No bed / waiting</option>
+              {% for b in beds_available %}
+                <option value="{{ b['id'] }}">{{ b['bed_number'] }}{% if b['ward'] %} · {{ b['ward'] }}{% endif %}{% if b['bed_type'] %} · {{ b['bed_type'] }}{% endif %}</option>
+              {% endfor %}
+            </select>
+            <p class="help-text" style="margin-top:0.35rem;">Only beds marked Available can be assigned.</p>
+          </div>
+          <div class="form-group">
+            <label for="reason">Reason / Notes</label>
+            <input id="reason" name="reason" placeholder="e.g., Fever observation, Surgery recovery">
+          </div>
+          <button class="btn primary" type="submit">Admit Patient</button>
+        </form>
+      {% endif %}
+    </div>
+
+    <div class="card" style="padding: 1rem; margin-top: 1rem; background: var(--bg-light); border: 1px solid var(--border);">
+      <div class="section-header" style="margin-bottom: 0.75rem;">
+        <h3 style="margin:0; font-size: 1rem;">Update Status</h3>
+        <span class="badge">{{ current_status or 'Not set' }}</span>
+      </div>
+      <form method="post" action="{{ url_for('staff_patient_status_update') }}">
+        <input type="hidden" name="health_id" value="{{ patient['health_id'] }}">
+        <div class="form-group inline" style="gap: 0.75rem;">
+          <select name="status" required style="flex:1;">
+            <option value="">Select status</option>
+            <option value="Admitted">Admitted</option>
+            <option value="Discharged">Discharged</option>
+            <option value="Under Observation">Under Observation</option>
+          </select>
+          <button class="btn primary" type="submit">Save</button>
+        </div>
+        <p class="help-text" style="margin-top: 0.5rem;">Staff can update admission workflow status. Doctor prescriptions remain read-only.</p>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-header">
+      <h2>Visit History</h2>
+      <span class="badge">{{ records|length if records else 0 }}</span>
+    </div>
+
+    {% if records %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Doctor</th>
+              <th>Status</th>
+              <th>Reports</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in records %}
+            <tr>
+              <td><strong>{{ r['date'] }}</strong></td>
+              <td>Dr. {{ r['doctor_name'] or '-' }}</td>
+              <td>{{ r['treatment_status'] or '-' }}</td>
+              <td>
+                {% if r['blood_report_filename'] %}<a class="link" target="_blank" href="{{ url_for('view_report', filename=r['blood_report_filename']) }}">Report</a>{% else %}<span class="help-text">-</span>{% endif %}
+                {% if r['prescription_filename'] %}<a class="link" target="_blank" href="{{ url_for('view_report', filename=r['prescription_filename']) }}">Rx</a>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="help-text">No visits found for this patient in your hospital.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

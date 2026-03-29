@@ -1,0 +1,90 @@
+{% extends 'staff/layout.html' %}
+
+{% block staff_page_title %}Emergencies{% endblock %}
+
+{% block staff_content %}
+<section class="two-column">
+  <div class="card form-card">
+    <div class="section-header">
+      <h2>Emergency Intake</h2>
+      <span class="badge" style="background:#fee2e2;color:#991b1b;">High priority</span>
+    </div>
+
+    <form method="post">
+      <div class="form-group">
+        <label for="name">Patient Name</label>
+        <input id="name" name="name" placeholder="Optional">
+      </div>
+      <div class="form-group">
+        <label for="phone">Phone</label>
+        <input id="phone" name="phone" placeholder="Optional">
+      </div>
+      <div class="form-group">
+        <label for="location">Location *</label>
+        <input id="location" name="location" required placeholder="Ward / Address / Landmark">
+      </div>
+      <div class="form-group">
+        <label for="symptoms">Symptoms</label>
+        <textarea id="symptoms" name="symptoms" rows="3" placeholder="Describe symptoms"></textarea>
+      </div>
+      <button class="btn primary full-width" type="submit">Create Emergency</button>
+      <p class="help-text" style="margin-top:0.5rem;">This will appear in the hospital emergency list. (Doctor notification can be enhanced later.)</p>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="section-header">
+      <h2>Emergency List</h2>
+      <span class="badge">{{ emergencies|length if emergencies else 0 }}</span>
+    </div>
+
+    {% if emergencies %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Patient</th>
+              <th>Location</th>
+              <th>Priority</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in emergencies %}
+            <tr style="background: rgba(254, 226, 226, 0.35);">
+              <td><strong>{{ e['requested_at'] }}</strong></td>
+              <td>
+                <div style="font-weight:800;">{{ e['name'] or '-' }}</div>
+                <div class="help-text">{{ e['phone'] or '-' }}</div>
+              </td>
+              <td>{{ e['location'] }}</td>
+              <td>
+                {% if e['priority'] %}
+                  {% if e['priority'] == 'Critical' %}
+                    <span class="badge" style="background:#fee2e2;color:#991b1b;">Critical</span>
+                  {% elif e['priority'] == 'High' %}
+                    <span class="badge" style="background:#ffedd5;color:#9a3412;">High</span>
+                  {% elif e['priority'] == 'Medium' %}
+                    <span class="badge" style="background:#fffbeb;color:#78350f;">Medium</span>
+                  {% else %}
+                    <span class="badge">{{ e['priority'] }}</span>
+                  {% endif %}
+                {% else %}
+                  <span class="help-text">-</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge" style="background:#fee2e2;color:#991b1b;">{{ e['status'] }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="help-text">No emergencies.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

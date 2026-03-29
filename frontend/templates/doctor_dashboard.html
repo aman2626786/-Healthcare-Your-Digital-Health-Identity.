@@ -1,0 +1,477 @@
+{% extends 'base.html' %}
+{% block title %}Doctor Dashboard{% endblock %}
+{% block content %}
+<div class="doctor-page">
+<section class="doctor-hero">
+    <div class="doctor-hero-left">
+        <div class="doctor-hero-title">
+            <h1>Doctor Dashboard</h1>
+            <p class="help-text">Search patients, update records, and prescribe medicines using hospital inventory.</p>
+        </div>
+    </div>
+    <div class="doctor-hero-actions">
+        <a href="{{ url_for('doctor_profile') }}" class="btn small">👤 Profile</a>
+        <a href="{{ url_for('doctor_logout') }}" class="btn small">Logout</a>
+    </div>
+</section>
+
+<section class="grid stats-grid">
+    <div class="card stat-card">
+        <div class="stat-label">Patients Seen</div>
+        <div class="stat-value" style="color: var(--primary);">{{ unique_patients_count or 0 }}</div>
+        <p class="help-text stat-subtext">Unique patients</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">Records Added</div>
+        <div class="stat-value" style="color: var(--success);">{{ total_records_count or 0 }}</div>
+        <p class="help-text stat-subtext">Records created</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">Recovered</div>
+        <div class="stat-value" style="color: #10b981;">{{ recovered_count or 0 }}</div>
+        <p class="help-text stat-subtext">Closed cases</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">Under Observation</div>
+        <div class="stat-value" style="color: var(--warning);">{{ observation_count or 0 }}</div>
+        <p class="help-text stat-subtext">Active cases</p>
+    </div>
+</section>
+
+<section class="card form-card mt-lg doctor-search-card">
+    <div class="section-header">
+        <h2>Search Patient</h2>
+        <span class="badge">Health ID</span>
+    </div>
+    <form method="post">
+        <div class="form-group inline" style="gap: 1rem;">
+            <input type="text" name="search_health_id" placeholder="e.g. H-1234-ABCD" value="{{ search_health_id or '' }}" required style="flex: 1;">
+            <button type="submit" class="btn primary">Search</button>
+        </div>
+        <p class="help-text" style="margin-top: 0.5rem;">Tip: Ask the patient for their Health ID (ABHA-like) from their QR/ID card.</p>
+    </form>
+</section>
+
+{% if patient %}
+<section class="two-column mt-lg">
+    <div class="card doctor-patient-card">
+        <div class="section-header">
+            <h2>Patient Overview</h2>
+            <span class="badge">Visits: {{ records|length }}</span>
+        </div>
+
+        <div class="doctor-patient-grid">
+            <div>
+                <div class="doctor-field-label">Name</div>
+                <div class="doctor-field-value">{{ patient['name'] }}</div>
+            </div>
+            <div>
+                <div class="doctor-field-label">Health ID</div>
+                <div class="doctor-field-value" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">{{ patient['health_id'] }}</div>
+            </div>
+            <div>
+                <div class="doctor-field-label">Email</div>
+                <div class="doctor-field-value">{{ patient['email'] }}</div>
+            </div>
+            <div>
+                <div class="doctor-field-label">Phone</div>
+                <div class="doctor-field-value">{{ patient['phone'] or '-' }}</div>
+            </div>
+            <div>
+                <div class="doctor-field-label">Age</div>
+                <div class="doctor-field-value">{{ patient['age'] or '-' }} years</div>
+            </div>
+            <div>
+                <div class="doctor-field-label">Address</div>
+                <div class="doctor-field-value">{{ patient['address'] or '-' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card form-card">
+        <div class="section-header">
+            <h2>New Medical Record</h2>
+            <span class="badge">Save to history</span>
+        </div>
+        <form id="add-record-form" method="post" action="{{ url_for('add_record', user_id=patient['id']) }}" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="date">Visit Date</label>
+                <input type="date" id="date" name="date" required>
+            </div>
+            <div class="form-group">
+                <label for="symptoms">Symptoms</label>
+                <textarea id="symptoms" name="symptoms" rows="2" placeholder="Describe patient symptoms"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="diagnosis">Diagnosis</label>
+                <textarea id="diagnosis" name="diagnosis" rows="2" placeholder="Medical diagnosis"></textarea>
+            </div>
+            <div class="card" style="background: var(--bg-light); border: 1px solid var(--border); margin-bottom: 0.75rem;">
+                <div class="section-header" style="margin-bottom: 0.75rem;">
+                    <h3 style="margin: 0; font-size: 1rem;">💊 Select Medicine from Inventory</h3>
+                    <span class="badge">{{ inventory_medicines|length if inventory_medicines else 0 }} items</span>
+                </div>
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                    <label for="medicine-search">Search medicine</label>
+                    <input type="text" id="medicine-search" placeholder="Type to search (name/type/mg)">
+                </div>
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                    <label for="medicine-select">Select</label>
+                    <select id="medicine-select">
+                        <option value="">Select a medicine</option>
+                    </select>
+                </div>
+                <div id="medicine-info" class="help-text" style="margin-bottom: 0.75rem;">Search and select to see availability, type, and strength.</div>
+                <div class="button-row">
+                    <button type="button" id="add-medicine-btn" class="btn small">Add to Medicines</button>
+                    <button type="button" id="clear-medicine-btn" class="btn small">Clear</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="medicines">Medicines</label>
+                <textarea id="medicines" name="medicines" rows="2" placeholder="One per line or comma-separated"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="dosage">Dosage Details</label>
+                <textarea id="dosage" name="dosage" rows="2" placeholder="e.g. Paracetamol 500mg, 1-0-1 for 5 days"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="treatment_status">Treatment Status</label>
+                <select id="treatment_status" name="treatment_status" required>
+                    <option value="">Select status</option>
+                    <option value="Under Observation">Under Observation</option>
+                    <option value="Stable">Stable</option>
+                    <option value="Recovered">Recovered</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="prescription_text">Prescription Notes</label>
+                <textarea id="prescription_text" name="prescription_text" rows="3" placeholder="Detailed prescription instructions"></textarea>
+            </div>
+            
+            <div style="margin: 1.5rem 0; padding: 1rem; background: var(--bg-light); border-radius: 0.5rem; border-left: 4px solid var(--primary);">
+                <h3 style="margin: 0 0 1rem 0; font-size: 1rem; color: var(--primary);">📊 Health Metrics (for Risk Assessment)</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div class="form-group" style="margin: 0;">
+                        <label for="age">Age</label>
+                        <input type="number" id="age" name="age" min="0" max="150" placeholder="Years">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="gender">Gender</label>
+                        <select id="gender" name="gender">
+                            <option value="">Select</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="systolic_bp">Systolic BP (mmHg)</label>
+                        <input type="number" id="systolic_bp" name="systolic_bp" min="50" max="250" placeholder="e.g. 120">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="diastolic_bp">Diastolic BP (mmHg)</label>
+                        <input type="number" id="diastolic_bp" name="diastolic_bp" min="30" max="150" placeholder="e.g. 80">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="bmi">BMI</label>
+                        <input type="number" id="bmi" name="bmi" min="10" max="60" step="0.1" placeholder="e.g. 22.5">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="cholesterol">Cholesterol (mg/dL)</label>
+                        <input type="number" id="cholesterol" name="cholesterol" min="0" max="500" step="0.1" placeholder="e.g. 200">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="glucose">Glucose (mg/dL)</label>
+                        <input type="number" id="glucose" name="glucose" min="0" max="500" step="0.1" placeholder="e.g. 100">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="smoking">Smoking</label>
+                        <select id="smoking" name="smoking">
+                            <option value="">Select</option>
+                            <option value="0">Non-Smoker</option>
+                            <option value="1">Smoker</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="alcohol">Alcohol</label>
+                        <select id="alcohol" name="alcohol">
+                            <option value="">Select</option>
+                            <option value="0">Habit Absent</option>
+                            <option value="1">Habit Present</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="physical_activity">Physical Activity (hours/week)</label>
+                        <select id="physical_activity" name="physical_activity">
+                            <option value="">Select</option>
+                            <option value="0">0 - No activity (Sedentary)</option>
+                            <option value="1">1 - ~1 hour/week (Very low)</option>
+                            <option value="2">2 - ~2 hours/week (Low)</option>
+                            <option value="3">3 - ~3 hours/week (Moderate)</option>
+                            <option value="4">4 - ~4 hours/week (Good)</option>
+                            <option value="5">5+ - 5+ hours/week (Active/Healthy)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="family_history">Family History</label>
+                        <select id="family_history" name="family_history">
+                            <option value="">Select</option>
+                            <option value="0">No family history</option>
+                            <option value="1">Family history present</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="blood_report_file">📄 Blood Report (PDF/Image)</label>
+                <input type="file" id="blood_report_file" name="blood_report_file" accept=".pdf,.jpg,.jpeg,.png">
+            </div>
+            <div class="form-group">
+                <label for="prescription_file">📄 Prescription File (optional)</label>
+                <input type="file" id="prescription_file" name="prescription_file" accept=".pdf,.jpg,.jpeg,.png">
+            </div>
+            <button type="submit" class="btn primary full-width">💾 Save Medical Record</button>
+        </form>
+    </div>
+</section>
+
+<section class="card mt-lg">
+    <div class="section-header">
+        <h2>📋 Medical History</h2>
+        <span class="badge">{{ records|length }} records</span>
+        {% if records %}
+        <div style="margin-left: auto; display: flex; gap: 0.5rem;">
+            <select id="status-filter" style="padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 0.85rem;">
+                <option value="all">All Status</option>
+                <option value="Under Observation">Under Observation</option>
+                <option value="Stable">Stable</option>
+                <option value="Recovered">Recovered</option>
+            </select>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if records %}
+    {% set latest = records[0] %}
+    <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.05)); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--primary);">
+        <p class="help-text" style="margin: 0;">
+            <strong>Latest Treatment:</strong> {{ latest['date'] }}
+            {% if latest['diagnosis'] %}
+                | <strong>Diagnosis:</strong> {{ latest['diagnosis'] }}
+            {% endif %}
+            | <strong>Doctor ID:</strong> <span style="font-family: monospace; color: var(--primary);">D-{{ latest['doctor_id'] }}</span>
+            | <strong>Hospital ID:</strong> <span style="font-family: monospace; color: var(--primary);">{{ latest['hospital_reg_no'] or '-' }}</span>
+            {% if latest['risk_level']|default('') %}
+                | <strong>AI Risk:</strong>
+                {% if latest['risk_level'] == 'Critical' %}
+                    <span class="badge" style="background: #fee2e2; color: #991b1b; font-weight: 600;">🚨 Critical</span>
+                {% elif latest['risk_level'] == 'High' %}
+                    <span class="badge" style="background: #fef3c7; color: #92400e; font-weight: 600;">⚠️ High</span>
+                {% elif latest['risk_level'] == 'Medium' %}
+                    <span class="badge" style="background: #fef3c7; color: #78350f;">⚡ Medium</span>
+                {% else %}
+                    <span class="badge" style="background: #ecfdf5; color: #065f46;">✓ Low</span>
+                {% endif %}
+            {% endif %}
+            {% if latest['treatment_status'] %}
+                | <strong>Status:</strong>
+                {% if latest['treatment_status'] == 'Recovered' %}
+                    <span class="badge" style="background: #ecfdf5; color: #065f46; border-left: 2px solid #10b981;">✅ Recovered</span>
+                {% elif latest['treatment_status'] == 'Stable' %}
+                    <span class="badge" style="background: #f0f9ff; color: #0c2d6b; border-left: 2px solid #0ea5e9;">🔵 Stable</span>
+                {% elif latest['treatment_status'] == 'Under Observation' %}
+                    <span class="badge" style="background: #fffbeb; color: #78350f; border-left: 2px solid #f59e0b;">⚠️ Under Observation</span>
+                {% else %}
+                    <span class="badge">{{ latest['treatment_status'] }}</span>
+                {% endif %}
+            {% endif %}
+        </p>
+    </div>
+
+    <table class="table" id="doctor-history-table" data-current-doctor-id="{{ current_user_id or 0 }}">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Doctor ID</th>
+                <th>Doctor Name</th>
+                <th>Hospital ID</th>
+                <th>Diagnosis</th>
+                <th>Medicines</th>
+                <th>AI Risk Level</th>
+                <th>Status</th>
+                <th>Files</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in records %}
+            <tr data-record-status="{{ record['treatment_status'] or '' }}">
+                <td><strong>{{ record['date'] }}</strong></td>
+                <td style="font-family: monospace; font-size: 0.9rem; color: var(--primary);">D-{{ record['doctor_id'] }}</td>
+                <td><strong>Dr. {{ record['doctor_name'] or '-' }}</strong></td>
+                <td style="font-family: monospace; font-size: 0.9rem; color: var(--primary);">{{ record['hospital_reg_no'] or '-' }}</td>
+                <td>{{ record['diagnosis'] or '-' }}</td>
+                <td>{{ record['medicines'][:30] or '-' }}{% if record['medicines'] and record['medicines']|length > 30 %}...{% endif %}</td>
+                <td>
+                    {% if record['risk_level']|default('') %}
+                        {% if record['risk_level'] == 'Critical' %}
+                            <span class="badge" style="background: #fee2e2; color: #991b1b; font-weight: 600;">🚨 Critical</span>
+                        {% elif record['risk_level'] == 'High' %}
+                            <span class="badge" style="background: #fef3c7; color: #92400e; font-weight: 600;">⚠️ High</span>
+                        {% elif record['risk_level'] == 'Medium' %}
+                            <span class="badge" style="background: #fef3c7; color: #78350f;">⚡ Medium</span>
+                        {% else %}
+                            <span class="badge" style="background: #ecfdf5; color: #065f46;">✓ Low</span>
+                        {% endif %}
+                        {% if record['risk_score']|default('') %}
+                            <br><small style="color: var(--text-light); font-size: 0.75rem;">Score: {{ "%.2f"|format(record['risk_score']) }}</small>
+                        {% endif %}
+                    {% else %}
+                        <span style="color: var(--text-light); font-size: 0.85rem;">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if record['treatment_status'] == 'Recovered' %}
+                        <span class="badge" style="background: #ecfdf5; color: #065f46;">✅ Recovered</span>
+                    {% elif record['treatment_status'] == 'Stable' %}
+                        <span class="badge" style="background: #f0f9ff; color: #0c2d6b;">🔵 Stable</span>
+                    {% elif record['treatment_status'] == 'Under Observation' %}
+                        <span class="badge" style="background: #fffbeb; color: #78350f;">⚠️ Observing</span>
+                    {% else %}
+                        <span class="badge">{{ record['treatment_status'] or '-' }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if record['blood_report_filename']|default('') or record['prescription_filename']|default('') %}
+                        {% if record['blood_report_filename']|default('') %}<a href="{{ url_for('view_report', filename=record['blood_report_filename']) }}" class="link" target="_blank">📄 Report</a>{% endif %}
+                        {% if record['prescription_filename']|default('') %}<a href="{{ url_for('view_report', filename=record['prescription_filename']) }}" class="link" target="_blank">📋 Rx</a>{% endif %}
+                    {% else %}
+                        <span style="color: var(--text-light);">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="#" class="link" style="font-size: 0.85rem;" data-record-id="{{ record['id'] }}" data-record-date="{{ record['date'] }}" data-record-doctor-id="{{ record['doctor_id'] }}" data-record-doctor-name="{{ record['doctor_name'] or '' }}" data-record-hospital-id="{{ record['hospital_reg_no'] or '' }}" data-record-hospital-name="{{ record['hospital_name'] or '' }}" data-record-diagnosis="{{ record['diagnosis'] or '' }}" data-record-medicines="{{ record['medicines'] or '' }}" data-record-dosage="{{ record['dosage'] or '' }}" data-record-status="{{ record['treatment_status'] or '' }}" data-record-symptoms="{{ record['symptoms'] or '' }}" data-record-prescription="{{ record['prescription_text'] or '' }}" data-record-risk-level="{{ record['risk_level'] or '' }}" data-record-risk-score="{{ record['risk_score'] or '' }}" onclick="return showRecordDetails(this);">View Details</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="help-text">No medical records found for this patient. Add a new record using the form above.</p>
+    {% endif %}
+</section>
+
+{% else %}
+<section class="card mt-lg" style="text-align: center; padding: 2rem;">
+    <p style="color: var(--text-light); font-size: 1.1rem;">🔍 Search for a patient by Health ID to view and manage their medical records</p>
+</section>
+{% endif %}
+
+<div id="recordModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="card" style="max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h2>📋 Medical Record Details</h2>
+            <button type="button" onclick="closeRecordModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">✕</button>
+        </div>
+        <div id="recordContent" style="display: grid; gap: 1rem;"></div>
+    </div>
+</div>
+
+<script type="application/json" id="inventory-medicines-data">{{ (inventory_medicines or [])|tojson }}</script>
+
+<script>
+function showRecordDetails(element) {
+    const recordId = element.getAttribute('data-record-id');
+    const recordDate = element.getAttribute('data-record-date');
+    const recordDoctorId = element.getAttribute('data-record-doctor-id');
+    const recordDoctorName = element.getAttribute('data-record-doctor-name');
+    const recordHospitalId = element.getAttribute('data-record-hospital-id');
+    const recordHospitalName = element.getAttribute('data-record-hospital-name');
+    const recordDiagnosis = element.getAttribute('data-record-diagnosis');
+    const recordMedicines = element.getAttribute('data-record-medicines');
+    const recordDosage = element.getAttribute('data-record-dosage');
+    const recordStatus = element.getAttribute('data-record-status');
+    const recordSymptoms = element.getAttribute('data-record-symptoms');
+    const recordPrescription = element.getAttribute('data-record-prescription');
+    const recordRiskLevel = element.getAttribute('data-record-risk-level');
+    const recordRiskScore = element.getAttribute('data-record-risk-score');
+    
+    let riskBadge = '';
+    if (recordRiskLevel) {
+        if (recordRiskLevel === 'Critical') {
+            riskBadge = '<span style="background: #fee2e2; color: #991b1b; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">🚨 Critical</span>';
+        } else if (recordRiskLevel === 'High') {
+            riskBadge = '<span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">⚠️ High</span>';
+        } else if (recordRiskLevel === 'Medium') {
+            riskBadge = '<span style="background: #fef3c7; color: #78350f; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">⚡ Medium</span>';
+        } else {
+            riskBadge = '<span style="background: #ecfdf5; color: #065f46; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">✓ Low</span>';
+        }
+    }
+    
+    const content = `
+        <div style="padding: 1rem; background: var(--bg-light); border-radius: 0.5rem;">
+            <p style="margin: 0;"><strong>📅 Date:</strong> ${recordDate}</p>
+            <p style="margin: 0.5rem 0 0 0;"><strong>👨‍⚕️ Doctor:</strong> Dr. ${recordDoctorName || '-'} (ID: <span style="font-family: monospace; color: var(--primary);">D-${recordDoctorId}</span>)</p>
+            <p style="margin: 0.5rem 0 0 0;"><strong>🏥 Hospital:</strong> ${recordHospitalName || '-'} (ID: <span style="font-family: monospace; color: var(--primary);">${recordHospitalId || '-'}</span>)</p>
+            ${recordRiskLevel ? `<p style="margin: 0.5rem 0 0 0;"><strong>🤖 AI Risk Assessment:</strong> ${riskBadge}${recordRiskScore ? ` (Score: ${parseFloat(recordRiskScore).toFixed(2)})` : ''}</p>` : ''}
+        </div>
+        <div>
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Symptoms</h3>
+            <p style="color: var(--text-light);">${recordSymptoms || '-'}</p>
+        </div>
+        <div>
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Diagnosis</h3>
+            <p style="color: var(--text-light);">${recordDiagnosis || '-'}</p>
+        </div>
+        <div>
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Medicines</h3>
+            <p style="color: var(--text-light);">${recordMedicines || '-'}</p>
+        </div>
+        <div>
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Dosage</h3>
+            <p style="color: var(--text-light);">${recordDosage || '-'}</p>
+        </div>
+        <div>
+            <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">Prescription Notes</h3>
+            <p style="color: var(--text-light);">${recordPrescription || '-'}</p>
+        </div>
+        <div style="padding: 1rem; background: var(--bg-light); border-radius: 0.5rem;">
+            <p><strong>Treatment Status:</strong> 
+                ${recordStatus === 'Recovered' ? '<span style="background: #ecfdf5; color: #065f46; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">✅ Recovered</span>' : 
+                  recordStatus === 'Stable' ? '<span style="background: #f0f9ff; color: #0c2d6b; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">🔵 Stable</span>' : 
+                  recordStatus === 'Under Observation' ? '<span style="background: #fffbeb; color: #78350f; padding: 0.25rem 0.5rem; border-radius: 0.25rem;">⚠️ Under Observation</span>' : 
+                  recordStatus}
+            </p>
+        </div>
+    `;
+    
+    document.getElementById('recordContent').innerHTML = content;
+    document.getElementById('recordModal').style.display = 'flex';
+    return false;
+}
+
+function closeRecordModal() {
+    document.getElementById('recordModal').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    setupStateDistrictDropdowns();
+    setupDoctorStatusFilter();
+    setupDoctorOwnVisitsFilter();
+    setupDoctorUseLastTreatment();
+    if (typeof setupDoctorMedicinePicker === 'function') {
+        setupDoctorMedicinePicker();
+    }
+    
+    // Close modal when clicking outside
+    document.getElementById('recordModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeRecordModal();
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends 'staff/layout.html' %}
+
+{% block staff_page_title %}Overview{% endblock %}
+
+{% block staff_content %}
+<section class="grid stats-grid" style="margin-top:0;">
+  <div class="card stat-card">
+    <div class="stat-label">Beds (Total)</div>
+    <div class="stat-value">{{ beds_total }}</div>
+    <p class="help-text stat-subtext">Available: {{ beds_available }}</p>
+    <a class="link" href="{{ url_for('staff_beds') }}">Manage beds</a>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-label">Active Admissions</div>
+    <div class="stat-value">{{ active_admissions }}</div>
+    <p class="help-text stat-subtext">Admit / discharge patients</p>
+    <a class="link" href="{{ url_for('staff_patients') }}">Manage patients</a>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-label">Inventory Items</div>
+    <div class="stat-value">{{ inventory_count }}</div>
+    <p class="help-text stat-subtext">Update stock levels</p>
+    <a class="link" href="{{ url_for('staff_inventory') }}">Manage inventory</a>
+  </div>
+</section>
+
+<section class="two-column mt-lg">
+  <div class="card">
+    <div class="section-header">
+      <h2>Quick Actions</h2>
+      <span class="badge">Staff</span>
+    </div>
+    <div class="button-row">
+      <a class="btn" href="{{ url_for('staff_patients') }}">Patient lookup</a>
+      <a class="btn" href="{{ url_for('staff_beds') }}">Add / update bed</a>
+      <a class="btn" href="{{ url_for('staff_inventory') }}">Add / update inventory</a>
+      <a class="btn" href="{{ url_for('staff_reports') }}">Upload reports</a>
+      <a class="btn" href="{{ url_for('staff_medicines') }}">Medicine administration</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-header">
+      <h2>Tips</h2>
+      <span class="badge">Workflow</span>
+    </div>
+    <p class="help-text">Use Patients to admit a patient and assign an available bed. Beds automatically switch between Available/Occupied based on admissions.</p>
+    <p class="help-text" style="margin-top:0.5rem;">Inventory updates here reflect availability hints shown in Medicines.</p>
+  </div>
+</section>
+{% endblock %}

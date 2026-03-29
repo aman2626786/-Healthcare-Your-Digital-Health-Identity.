@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}Health Organisation - Manage Hospitals{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>🏥 Manage Hospitals</h1>
+        <p class="help-text">Search, filter and delete hospitals</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('health_admin_dashboard') }}" class="btn small">Back to Dashboard</a>
+        <a href="{{ url_for('health_admin_logout') }}" class="btn small">Logout</a>
+    </div>
+</div>
+
+<div class="card form-card" style="margin-bottom: 1rem;">
+    <form method="get" action="{{ url_for('health_admin_hospitals') }}" style="display:grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 0.75rem; align-items:end;">
+        <div class="form-group" style="margin-bottom:0;">
+            <label for="state">State</label>
+            <select id="state" name="state">
+                <option value="">All</option>
+                {% for s in states %}
+                    <option value="{{ s }}" {% if state == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <label for="district">District</label>
+            <select id="district" name="district">
+                <option value="">All</option>
+                {% for d in districts %}
+                    <option value="{{ d }}" {% if district == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <label for="q">Search</label>
+            <input id="q" name="q" placeholder="Name / Reg No / Email" value="{{ q }}">
+        </div>
+        <button class="btn primary" type="submit" style="height:42px;">Apply</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="section-header" style="justify-content: space-between; width:100%;">
+        <h2>Hospitals</h2>
+        <span class="badge">{{ total }}</span>
+    </div>
+
+    {% if hospitals %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Reg No</th>
+                    <th>Email</th>
+                    <th>State</th>
+                    <th>District</th>
+                    <th>Doctors</th>
+                    <th>Staff</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in hospitals %}
+                <tr>
+                    <td><a class="link" href="{{ url_for('health_admin_hospital_detail', hospital_id=h['id']) }}">{{ h['name'] }}</a></td>
+                    <td>{{ h['reg_no'] }}</td>
+                    <td>{{ h['email'] }}</td>
+                    <td>{{ h['state'] or '-' }}</td>
+                    <td>{{ h['district'] or '-' }}</td>
+                    <td>{{ h['doctors_count'] }}</td>
+                    <td>{{ h['staff_count'] }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('health_admin_delete_hospital', hospital_id=h['id']) }}" onsubmit="return confirm('Delete hospital and related data? This cannot be undone.');">
+                            <button type="submit" class="btn small danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pages and pages > 1 %}
+    <div class="button-row" style="margin-top: 0.75rem; justify-content: space-between;">
+        <div class="help-text">Page {{ page }} / {{ pages }}</div>
+        <div class="button-row">
+            {% if page > 1 %}
+                <a class="btn small" href="{{ url_for('health_admin_hospitals', state=state, district=district, q=q, page=page-1) }}">Prev</a>
+            {% endif %}
+            {% if page < pages %}
+                <a class="btn small" href="{{ url_for('health_admin_hospitals', state=state, district=district, q=q, page=page+1) }}">Next</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <p class="help-text">No hospitals found for the selected filters.</p>
+    {% endif %}
+</div>
+
+<script>
+  (function () {
+    var stateSel = document.getElementById('state');
+    var districtSel = document.getElementById('district');
+    if (!stateSel || !districtSel) return;
+    stateSel.addEventListener('change', function () {
+      districtSel.value = '';
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,560 @@
+{% extends 'base.html' %}
+{% block title %}Health Organisation Dashboard{% endblock %}
+{% block content %}
+<section class="ha-hero">
+    <div class="ha-hero-left">
+        <div class="ha-hero-badge">Health Organisation</div>
+        <h1 class="ha-hero-title">Health Organisation Dashboard</h1>
+        <p class="ha-hero-subtitle">Monitor coverage, capacity and emergency readiness state-wise / district-wise</p>
+    </div>
+    <div class="ha-hero-actions">
+        <a href="{{ url_for('health_admin_emergencies') }}" class="btn small primary">Emergencies</a>
+        <a href="{{ url_for('health_admin_hospitals') }}" class="btn small">Manage Hospitals</a>
+        <a href="{{ url_for('health_admin_export', kind='areas', state=state, district=district) }}" class="btn small">Export Areas</a>
+        <a href="{{ url_for('health_admin_export', kind='hospitals', state=state, district=district) }}" class="btn small">Export Hospitals</a>
+        <a href="{{ url_for('health_admin_export', kind='doctors', state=state, district=district) }}" class="btn small">Export Doctors</a>
+        <a href="{{ url_for('health_admin_export', kind='patients', state=state, district=district) }}" class="btn small">Export Patients</a>
+        <a href="{{ url_for('health_admin_logout') }}" class="btn small">Logout</a>
+    </div>
+ </section>
+
+<div class="card ha-filter-card">
+    <form id="health-admin-filter-form" method="get" action="{{ url_for('health_admin_dashboard') }}" class="ha-filter-grid">
+        <div class="form-group">
+            <label for="state">State / UT</label>
+            <select id="state" name="state">
+                <option value="">All States</option>
+                {% for s in states %}
+                    <option value="{{ s }}" {% if state == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="district">District</label>
+            <select id="district" name="district">
+                <option value="">All Districts</option>
+                {% for d in districts %}
+                    <option value="{{ d }}" {% if district == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn primary ha-filter-btn">Apply</button>
+    </form>
+</div>
+
+<script>
+  (function () {
+    var form = document.getElementById('health-admin-filter-form');
+    var stateSel = document.getElementById('state');
+    var districtSel = document.getElementById('district');
+    if (!form || !stateSel || !districtSel) return;
+
+    stateSel.addEventListener('change', function () {
+      districtSel.value = '';
+      form.submit();
+    });
+
+    districtSel.addEventListener('change', function () {
+      form.submit();
+    });
+  })();
+</script>
+
+<section class="two-column mt-lg ha-section">
+    <div class="card ha-panel">
+        <div class="ha-panel-head">
+            <h2 class="ha-panel-title">Top Districts (Doctors)</h2>
+        </div>
+        <div class="ha-chart-wrap" data-chart="district_doctors">
+            <canvas id="haChartDistrictDoctors" class="ha-chart-canvas" height="220"></canvas>
+        </div>
+        {% if district_doctors %}
+            <div class="ha-bars" data-fallback="district_doctors">
+                {% for row in district_doctors %}
+                    {% set name = row['district'] or '-' %}
+                    {% set val = row['c'] or 0 %}
+                    <div class="ha-bar-row">
+                        <div class="ha-bar-label">{{ name }}</div>
+                        <div class="ha-bar-track ha-bar-track-blue">
+                            <div class="ha-bar ha-bar-blue" data-width="{{ (val * 100.0 / (district_doctors[0]['c'] if district_doctors[0]['c'] else 1)) }}"></div>
+                        </div>
+                        <div class="ha-bar-value">{{ val }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="help-text">No chart data available.</p>
+        {% endif %}
+    </div>
+
+    <div class="card ha-panel">
+        <div class="ha-panel-head">
+            <h2 class="ha-panel-title">Top Districts (Patients)</h2>
+        </div>
+        <div class="ha-chart-wrap" data-chart="district_patients">
+            <canvas id="haChartDistrictPatients" class="ha-chart-canvas" height="220"></canvas>
+        </div>
+        {% if district_patients %}
+            <div class="ha-bars" data-fallback="district_patients">
+                {% for row in district_patients %}
+                    {% set name = row['district'] or '-' %}
+                    {% set val = row['c'] or 0 %}
+                    <div class="ha-bar-row">
+                        <div class="ha-bar-label">{{ name }}</div>
+                        <div class="ha-bar-track ha-bar-track-green">
+                            <div class="ha-bar ha-bar-green" data-width="{{ (val * 100.0 / (district_patients[0]['c'] if district_patients[0]['c'] else 1)) }}"></div>
+                        </div>
+                        <div class="ha-bar-value">{{ val }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="help-text">No chart data available.</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="ha-charts-grid ha-section">
+    <div class="card ha-panel">
+        <div class="ha-panel-head">
+            <h2 class="ha-panel-title">Beds Availability</h2>
+        </div>
+        <div class="ha-kpi-chart">
+            <canvas id="haChartBeds" class="ha-chart-canvas" height="220"></canvas>
+            <div class="help-text">Available: {{ beds_available }} / Total: {{ beds_total }}</div>
+        </div>
+    </div>
+    <div class="card ha-panel">
+        <div class="ha-panel-head">
+            <h2 class="ha-panel-title">Emergencies</h2>
+        </div>
+        <div class="ha-kpi-chart">
+            <canvas id="haChartEmergencies" class="ha-chart-canvas" height="220"></canvas>
+            <div class="help-text">Assigned: {{ emergencies_assigned }} / Unassigned: {{ emergencies_unassigned }}</div>
+        </div>
+    </div>
+</section>
+
+<script>
+  (function () {
+    var bars = document.querySelectorAll('.ha-bar');
+    if (!bars || !bars.length) return;
+    bars.forEach(function (el) {
+      var w = parseFloat(el.getAttribute('data-width') || '0');
+      if (!isFinite(w) || w < 0) w = 0;
+      if (w > 100) w = 100;
+      el.style.width = w + '%';
+    });
+  })();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script type="application/json" id="haChartDataDistrictDoctors">{
+  "labels": [{% for r in (district_doctors or []) %}{{ (r['district'] or '-')|tojson }}{% if not loop.last %},{% endif %}{% endfor %}],
+  "values": [{% for r in (district_doctors or []) %}{{ (r['c'] or 0) }}{% if not loop.last %},{% endif %}{% endfor %}]
+}</script>
+
+<script type="application/json" id="haChartDataDistrictPatients">{
+  "labels": [{% for r in (district_patients or []) %}{{ (r['district'] or '-')|tojson }}{% if not loop.last %},{% endif %}{% endfor %}],
+  "values": [{% for r in (district_patients or []) %}{{ (r['c'] or 0) }}{% if not loop.last %},{% endif %}{% endfor %}]
+}</script>
+
+<script type="application/json" id="haChartDataKpis">{
+  "beds_total": {{ beds_total or 0 }},
+  "beds_available": {{ beds_available or 0 }},
+  "emergencies_assigned": {{ emergencies_assigned or 0 }},
+  "emergencies_unassigned": {{ emergencies_unassigned or 0 }}
+}</script>
+
+<script>
+  (function () {
+    function readJson(id) {
+      var el = document.getElementById(id);
+      if (!el) return null;
+      try {
+        return JSON.parse(el.textContent || el.innerText || 'null');
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function hideFallback(key) {
+      var el = document.querySelector('[data-fallback="' + key + '"]');
+      if (el) el.style.display = 'none';
+    }
+
+    if (!window.Chart) return;
+
+    try {
+      var dd = readJson('haChartDataDistrictDoctors') || { labels: [], values: [] };
+      var dp = readJson('haChartDataDistrictPatients') || { labels: [], values: [] };
+      var kpis = readJson('haChartDataKpis') || {};
+
+      var doctorsLabels = dd.labels || [];
+      var doctorsValues = dd.values || [];
+      var patientsLabels = dp.labels || [];
+      var patientsValues = dp.values || [];
+
+      var dc = document.getElementById('haChartDistrictDoctors');
+      if (dc && doctorsLabels.length) {
+        new Chart(dc, {
+          type: 'bar',
+          data: {
+            labels: doctorsLabels.map(function (x) { return x || '-'; }),
+            datasets: [{
+              label: 'Doctors',
+              data: doctorsValues,
+              borderRadius: 8,
+              backgroundColor: 'rgba(37, 99, 235, 0.75)'
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { color: 'rgba(226,232,240,0.8)' } },
+              y: { grid: { display: false } }
+            }
+          }
+        });
+        hideFallback('district_doctors');
+      }
+
+      var pc = document.getElementById('haChartDistrictPatients');
+      if (pc && patientsLabels.length) {
+        new Chart(pc, {
+          type: 'bar',
+          data: {
+            labels: patientsLabels.map(function (x) { return x || '-'; }),
+            datasets: [{
+              label: 'Patients',
+              data: patientsValues,
+              borderRadius: 8,
+              backgroundColor: 'rgba(16, 185, 129, 0.75)'
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { color: 'rgba(226,232,240,0.8)' } },
+              y: { grid: { display: false } }
+            }
+          }
+        });
+        hideFallback('district_patients');
+      }
+
+      var bedsTotal = kpis.beds_total || 0;
+      var bedsAvailable = kpis.beds_available || 0;
+      var bedsOccupied = Math.max(0, bedsTotal - bedsAvailable);
+      var bc = document.getElementById('haChartBeds');
+      if (bc) {
+        new Chart(bc, {
+          type: 'doughnut',
+          data: {
+            labels: ['Available', 'Occupied'],
+            datasets: [{
+              data: [bedsAvailable, bedsOccupied],
+              backgroundColor: ['rgba(16,185,129,0.8)', 'rgba(148,163,184,0.9)'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '68%',
+            plugins: { legend: { position: 'bottom' } }
+          }
+        });
+      }
+
+      var emergenciesAssigned = kpis.emergencies_assigned || 0;
+      var emergenciesUnassigned = kpis.emergencies_unassigned || 0;
+      var ec = document.getElementById('haChartEmergencies');
+      if (ec) {
+        new Chart(ec, {
+          type: 'doughnut',
+          data: {
+            labels: ['Assigned', 'Unassigned'],
+            datasets: [{
+              data: [emergenciesAssigned, emergenciesUnassigned],
+              backgroundColor: ['rgba(37,99,235,0.8)', 'rgba(239,68,68,0.85)'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '68%',
+            plugins: { legend: { position: 'bottom' } }
+          }
+        });
+      }
+    } catch (e) {
+      return;
+    }
+  })();
+</script>
+
+{% if emergencies_unassigned and emergencies_unassigned > 0 %}
+<section class="mt-lg ha-section">
+    <div class="card ha-panel">
+        <div class="ha-panel-head ha-panel-head-split">
+            <h2 class="ha-panel-title">Unassigned Emergencies</h2>
+            <a href="{{ url_for('health_admin_emergencies', state=state, district=district, assigned='no') }}" class="btn small primary">View / Assign</a>
+        </div>
+        <p class="help-text" style="margin: 0;">Pending unassigned: <strong>{{ emergencies_unassigned }}</strong></p>
+    </div>
+</section>
+{% endif %}
+
+<section class="grid stats-grid ha-kpi-grid ha-section">
+    <div class="card stat-card">
+        <div class="stat-label">🏥 Hospitals</div>
+        <div class="stat-value">{{ hospitals|length }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">👨‍⚕️ Doctors</div>
+        <div class="stat-value">{{ doctors|length }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">👥 Patients (Treated)</div>
+        <div class="stat-value">{{ patients|length }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🛏️ Beds (Total / Available)</div>
+        <div class="stat-value">{{ beds_total }} / {{ beds_available }}</div>
+        <p class="help-text stat-subtext">Capacity across selected area</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🏥 Active Admissions</div>
+        <div class="stat-value">{{ active_admissions }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🚑 Emergencies (Assigned / Unassigned)</div>
+        <div class="stat-value">{{ emergencies_assigned }} / {{ emergencies_unassigned }}</div>
+        <p class="help-text stat-subtext">Total: {{ emergencies_total }}</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">📦 Low Stock Alerts</div>
+        <div class="stat-value">{{ low_stock_total }}</div>
+    </div>
+</section>
+
+<section class="ha-masonry ha-section">
+    <div class="card ha-panel">
+        <div class="ha-panel-head">
+            <h2 class="ha-panel-title">Areas Summary</h2>
+        </div>
+        {% if areas %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>State</th>
+                        <th>District</th>
+                        <th>Hospitals</th>
+                        <th>Doctors</th>
+                        <th>Patients</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in areas %}
+                    <tr>
+                        <td>{{ a['state'] or '-' }}</td>
+                        <td>{{ a['district'] or '-' }}</td>
+                        <td>{{ a['hospitals_count'] }}</td>
+                        <td>{{ a['doctors_count'] }}</td>
+                        <td>{{ a['patients_count'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No area data available.</p>
+        {% endif %}
+    </div>
+
+    <div class="card ha-panel">
+        <div class="ha-panel-head">
+            <h2 class="ha-panel-title">Hospital List</h2>
+        </div>
+        <form method="get" action="{{ url_for('health_admin_dashboard') }}" class="ha-search-row">
+            <input type="hidden" name="state" value="{{ state }}">
+            <input type="hidden" name="district" value="{{ district }}">
+            <input type="hidden" name="q_doctor" value="{{ q_doctor }}">
+            <input type="hidden" name="q_patient" value="{{ q_patient }}">
+            <input type="text" name="q_hospital" placeholder="Search hospitals (name/reg/email)" value="{{ q_hospital }}">
+            <button type="submit" class="btn small">Search</button>
+        </form>
+        {% if hospitals %}
+        {% set hospitals_pages = (hospitals_total + per_page - 1) // per_page %}
+        <div class="help-text ha-meta">Showing {{ hospitals|length }} of {{ hospitals_total }} hospitals</div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Reg No</th>
+                        <th>State</th>
+                        <th>District</th>
+                        <th>Doctors</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in hospitals %}
+                    <tr>
+                        <td><a class="link" href="{{ url_for('health_admin_hospital_detail', hospital_id=h['id']) }}">{{ h['name'] }}</a></td>
+                        <td>{{ h['reg_no'] }}</td>
+                        <td>{{ h['state'] or '-' }}</td>
+                        <td>{{ h['district'] or '-' }}</td>
+                        <td>{{ h['doctors_count'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if hospitals_pages > 1 %}
+        <div class="ha-pagination">
+            <div class="help-text">Page {{ page_hospitals }} / {{ hospitals_pages }}</div>
+            <div class="button-row">
+                {% if page_hospitals > 1 %}
+                    <a class="btn small" href="{{ url_for('health_admin_dashboard', state=state, district=district, q_hospital=q_hospital, q_doctor=q_doctor, q_patient=q_patient, page_hospitals=page_hospitals-1, page_doctors=page_doctors, page_patients=page_patients) }}">Prev</a>
+                {% endif %}
+                {% if page_hospitals < hospitals_pages %}
+                    <a class="btn small" href="{{ url_for('health_admin_dashboard', state=state, district=district, q_hospital=q_hospital, q_doctor=q_doctor, q_patient=q_patient, page_hospitals=page_hospitals+1, page_doctors=page_doctors, page_patients=page_patients) }}">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <p>No hospitals found for the selected filters.</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="ha-masonry ha-section">
+    <div class="card ha-panel">
+        <div class="ha-panel-head">
+            <h2 class="ha-panel-title">Doctor List</h2>
+        </div>
+        <form method="get" action="{{ url_for('health_admin_dashboard') }}" class="ha-search-row">
+            <input type="hidden" name="state" value="{{ state }}">
+            <input type="hidden" name="district" value="{{ district }}">
+            <input type="hidden" name="q_hospital" value="{{ q_hospital }}">
+            <input type="hidden" name="q_patient" value="{{ q_patient }}">
+            <input type="text" name="q_doctor" placeholder="Search doctors (name/email/specialization)" value="{{ q_doctor }}">
+            <button type="submit" class="btn small">Search</button>
+        </form>
+        {% if doctors %}
+        {% set doctors_pages = (doctors_total + per_page - 1) // per_page %}
+        <div class="help-text ha-meta">Showing {{ doctors|length }} of {{ doctors_total }} doctors</div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Specialization</th>
+                        <th>Hospital</th>
+                        <th>State</th>
+                        <th>District</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in doctors %}
+                    <tr>
+                        <td>{{ d['name'] }}</td>
+                        <td>{{ d['email'] }}</td>
+                        <td>{{ d['specialization'] or '-' }}</td>
+                        <td>{{ d['hospital_name'] }}</td>
+                        <td>{{ d['hospital_state'] or '-' }}</td>
+                        <td>{{ d['hospital_district'] or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if doctors_pages > 1 %}
+        <div class="ha-pagination">
+            <div class="help-text">Page {{ page_doctors }} / {{ doctors_pages }}</div>
+            <div class="button-row">
+                {% if page_doctors > 1 %}
+                    <a class="btn small" href="{{ url_for('health_admin_dashboard', state=state, district=district, q_hospital=q_hospital, q_doctor=q_doctor, q_patient=q_patient, page_hospitals=page_hospitals, page_doctors=page_doctors-1, page_patients=page_patients) }}">Prev</a>
+                {% endif %}
+                {% if page_doctors < doctors_pages %}
+                    <a class="btn small" href="{{ url_for('health_admin_dashboard', state=state, district=district, q_hospital=q_hospital, q_doctor=q_doctor, q_patient=q_patient, page_hospitals=page_hospitals, page_doctors=page_doctors+1, page_patients=page_patients) }}">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <p>No doctors found for the selected filters.</p>
+        {% endif %}
+    </div>
+
+    <div class="card ha-panel">
+        <div class="ha-panel-head">
+            <h2 class="ha-panel-title">Patient List (Treated)</h2>
+        </div>
+        <form method="get" action="{{ url_for('health_admin_dashboard') }}" class="ha-search-row">
+            <input type="hidden" name="state" value="{{ state }}">
+            <input type="hidden" name="district" value="{{ district }}">
+            <input type="hidden" name="q_hospital" value="{{ q_hospital }}">
+            <input type="hidden" name="q_doctor" value="{{ q_doctor }}">
+            <input type="text" name="q_patient" placeholder="Search patients (name/health id/phone)" value="{{ q_patient }}">
+            <button type="submit" class="btn small">Search</button>
+        </form>
+        {% if patients %}
+        {% set patients_pages = (patients_total + per_page - 1) // per_page %}
+        <div class="help-text ha-meta">Showing {{ patients|length }} of {{ patients_total }} patients</div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Health ID</th>
+                        <th>Phone</th>
+                        <th>Visits</th>
+                        <th>Last Visit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in patients %}
+                    <tr>
+                        <td>{{ p['name'] }}</td>
+                        <td>{{ p['health_id'] }}</td>
+                        <td>{{ p['phone'] or '-' }}</td>
+                        <td>{{ p['visits'] }}</td>
+                        <td>{{ p['last_visit'] or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if patients_pages > 1 %}
+        <div class="ha-pagination">
+            <div class="help-text">Page {{ page_patients }} / {{ patients_pages }}</div>
+            <div class="button-row">
+                {% if page_patients > 1 %}
+                    <a class="btn small" href="{{ url_for('health_admin_dashboard', state=state, district=district, q_hospital=q_hospital, q_doctor=q_doctor, q_patient=q_patient, page_hospitals=page_hospitals, page_doctors=page_doctors, page_patients=page_patients-1) }}">Prev</a>
+                {% endif %}
+                {% if page_patients < patients_pages %}
+                    <a class="btn small" href="{{ url_for('health_admin_dashboard', state=state, district=district, q_hospital=q_hospital, q_doctor=q_doctor, q_patient=q_patient, page_hospitals=page_hospitals, page_doctors=page_doctors, page_patients=page_patients+1) }}">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <p>No patients found for the selected filters.</p>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

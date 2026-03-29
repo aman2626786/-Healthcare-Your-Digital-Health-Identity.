@@ -1,0 +1,119 @@
+═══════════════════════════════════════════════════════════════
+  RENDER.COM DEPLOYMENT - STEP BY STEP INSTRUCTIONS
+═══════════════════════════════════════════════════════════════
+
+STEP 1: PREPARE YOUR CODE
+──────────────────────────
+✓ Push your code to GitHub/GitLab/Bitbucket
+✓ Ensure all files are committed
+✓ Verify requirements.txt is up to date
+
+STEP 2: CREATE RENDER ACCOUNT
+──────────────────────────────
+1. Go to https://render.com
+2. Sign up for free account
+3. Verify your email
+
+STEP 3: CREATE WEB SERVICE
+───────────────────────────
+1. Click "New +" button (top right)
+2. Select "Web Service"
+3. Connect your Git repository:
+   - Authorize Render to access your Git account
+   - Select your repository
+   - Select branch (usually "main" or "master")
+
+STEP 4: CONFIGURE SERVICE
+─────────────────────────
+Service Name: swasthya-sampark (or your preferred name)
+
+Build Settings:
+  Build Command:  pip install -r requirements.txt
+  Start Command:  gunicorn --config gunicorn_config.py wsgi:application
+
+Environment: Python 3
+Plan: Free (or choose paid plan)
+
+STEP 5: SET ENVIRONMENT VARIABLES
+────────────────────────────────
+Click on "Environment" tab, then "Add Environment Variable"
+
+Add these variables one by one:
+
+1. FLASK_APP
+   Value: backend/app.py
+
+2. FLASK_ENV
+   Value: production
+
+3. FLASK_DEBUG
+   Value: 0
+
+4. SECRET_KEY
+   Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+   Or use online: https://randomkeygen.com/
+   Copy the generated key and paste as value
+
+5. FIREBASE_WEB_API_KEY
+   Get from: https://console.firebase.google.com
+   → Your Project → ⚙️ Settings → General → Web API Key
+   Copy and paste as value
+
+6. OTP_CODE_LENGTH
+   Value: 6
+
+7. OTP_EXPIRY_MINUTES
+   Value: 10
+
+8. MAX_UPLOAD_SIZE
+   Value: 16777216
+
+9. PRODUCTION
+   Value: True
+
+10. LOG_LEVEL
+    Value: INFO
+
+STEP 6: DEPLOY
+──────────────
+1. Click "Create Web Service"
+2. Wait for build to complete (2-5 minutes)
+3. Watch build logs for any errors
+4. Service will be available at: https://your-service-name.onrender.com
+
+STEP 7: VERIFY DEPLOYMENT
+─────────────────────────
+1. Visit your service URL
+2. Test user registration
+3. Test login (password and OTP)
+4. Check logs in Render dashboard if issues
+
+TROUBLESHOOTING
+───────────────
+❌ Build fails?
+   → Check build logs
+   → Verify requirements.txt is correct
+   → Ensure Python 3.11+ is selected
+
+❌ Service won't start?
+   → Check environment variables are set
+   → Verify SECRET_KEY is set
+   → Check start command is correct
+
+❌ OTP not working?
+   → Verify FIREBASE_WEB_API_KEY is correct
+   → Check Firebase project settings
+   → Review application logs
+
+❌ Database errors?
+   → SQLite works on Render (data persists during service lifetime)
+   → For production, consider Render PostgreSQL
+
+QUICK REFERENCE
+───────────────
+📄 Full Guide: RENDER_DEPLOYMENT.md
+📋 Environment Variables: render.env
+⚡ Quick Reference: RENDER_ENV_QUICKREF.md
+
+═══════════════════════════════════════════════════════════════
+

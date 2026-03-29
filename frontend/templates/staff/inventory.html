@@ -1,0 +1,105 @@
+{% extends 'staff/layout.html' %}
+
+{% block staff_page_title %}Inventory{% endblock %}
+
+{% block staff_content %}
+<section class="two-column">
+  <div class="card form-card">
+    <div class="section-header">
+      <h2>Add / Update Item</h2>
+      <span class="badge">Staff</span>
+    </div>
+
+    <form method="post">
+      <input type="hidden" name="action" value="save">
+      <div class="form-group">
+        <label for="item_name">Item Name</label>
+        <input id="item_name" name="item_name" placeholder="e.g., Paracetamol 500mg" required>
+      </div>
+      <div class="form-group inline">
+        <div style="flex: 1;">
+          <label for="medicine_type">Medicine Type</label>
+          <input id="medicine_type" name="medicine_type" placeholder="e.g., Tablet, Syrup">
+        </div>
+        <div style="flex: 1;">
+          <label for="strength_mg">Strength (mg)</label>
+          <input id="strength_mg" name="strength_mg" type="number" step="0.01" placeholder="e.g., 500">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="category">Category</label>
+        <input id="category" name="category" placeholder="e.g., Medicine, PPE, Oxygen">
+      </div>
+      <div class="form-group inline">
+        <div style="flex:1;">
+          <label for="quantity">Quantity</label>
+          <input id="quantity" name="quantity" type="number" value="0">
+        </div>
+        <div style="flex:1;">
+          <label for="unit">Unit</label>
+          <input id="unit" name="unit" placeholder="e.g., strips, pcs">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="reorder_level">Reorder Level (Low Stock Threshold)</label>
+        <input id="reorder_level" name="reorder_level" type="number" value="0">
+      </div>
+      <div class="form-group">
+        <label for="notes">Notes</label>
+        <input id="notes" name="notes" placeholder="Optional notes">
+      </div>
+      <button class="btn primary full-width" type="submit">Save Item</button>
+      <p class="help-text" style="margin-top:0.5rem;">If an item with the same name already exists, it will be updated.</p>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="section-header">
+      <h2>Current Stock</h2>
+      <span class="badge">{{ items|length if items else 0 }}</span>
+    </div>
+
+    {% if items %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Category</th>
+            <th>Qty</th>
+            <th>Reorder</th>
+            <th>Updated</th>
+            <th>Quick Update</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+          <tr {% if it['quantity'] <= it['reorder_level'] %}style="background: #fffbeb;"{% endif %}>
+            <td>
+              <div style="font-weight: 800;">{{ it['item_name'] }}</div>
+              <div class="help-text">{{ it['medicine_type'] or '-' }}{% if it['strength_mg'] %} · {{ it['strength_mg'] }}mg{% endif %}{% if it['unit'] %} · {{ it['unit'] }}{% endif %}</div>
+              {% if it['notes'] %}<div class="help-text">{{ it['notes'] }}</div>{% endif %}
+            </td>
+            <td>{{ it['category'] or '-' }}</td>
+            <td><strong>{{ it['quantity'] }}</strong></td>
+            <td>{{ it['reorder_level'] }}</td>
+            <td><span class="help-text">{{ it['last_updated'] }}</span></td>
+            <td>
+              <form method="post" style="display:flex; gap:0.5rem; align-items:center;">
+                <input type="hidden" name="action" value="update">
+                <input type="hidden" name="item_id" value="{{ it['id'] }}">
+                <input type="number" name="quantity" value="{{ it['quantity'] }}" style="max-width: 110px;">
+                <button class="btn small" type="submit">Update</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="help-text">No inventory items added yet.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

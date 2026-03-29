@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% block title %}User Dashboard{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>👋 Welcome, {{ user['name'] }}</h1>
+        <p class="help-text">Manage your health records, emergencies and medical history</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('user_profile') }}" class="btn small">👤 Profile</a>
+        <a href="{{ url_for('emergency') }}" class="btn danger small">🚑 Emergency</a>
+        <a href="{{ url_for('user_records_export_csv') }}" class="btn small">Export Records</a>
+        <a href="{{ url_for('user_emergencies_export_csv') }}" class="btn small">Export Emergencies</a>
+        <a href="{{ url_for('user_logout') }}" class="btn small">Logout</a>
+    </div>
+</div>
+
+<section class="grid stats-grid">
+    <div class="card stat-card">
+        <div class="stat-label">🧾 Records</div>
+        <div class="stat-value">{{ records_count if records_count is defined else (records|length if records is defined else 0) }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🏥 Hospitals Visited</div>
+        <div class="stat-value">{{ hospitals|length if hospitals is defined else 0 }}</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🚑 Emergencies</div>
+        <div class="stat-value">{{ emergencies_total if emergencies_total is defined else (emergencies|length if emergencies is defined else 0) }}</div>
+        <p class="help-text stat-subtext">Assigned / Unassigned: {{ emergencies_assigned if emergencies_assigned is defined else 0 }} / {{ emergencies_unassigned if emergencies_unassigned is defined else 0 }}</p>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-label">🆔 Health ID</div>
+        <div class="stat-value" style="font-size: 1.1rem;">{{ user['health_id'] }}</div>
+        <p class="help-text stat-subtext">Show QR at hospitals</p>
+    </div>
+</section>
+
+<section class="grid">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2>👤 Your Profile</h2>
+            <a href="{{ url_for('user_profile') }}" class="btn small">Edit Profile</a>
+        </div>
+        <div style="display: grid; gap: 0.75rem;">
+            <div>
+                <span style="color: var(--text-light); font-size: 0.85rem;">Name</span>
+                <p style="font-weight: 600;">{{ user['name'] }}</p>
+            </div>
+            <div>
+                <span style="color: var(--text-light); font-size: 0.85rem;">Email</span>
+                <p style="font-weight: 600;">{{ user['email'] }}</p>
+            </div>
+            <div>
+                <span style="color: var(--text-light); font-size: 0.85rem;">Phone</span>
+                <p style="font-weight: 600;">{{ user['phone'] or '-' }}</p>
+            </div>
+            <div>
+                <span style="color: var(--text-light); font-size: 0.85rem;">Address</span>
+                <p style="font-weight: 600;">{{ user['address'] or '-' }}</p>
+            </div>
+            {% if user['age'] %}
+            <div>
+                <span style="color: var(--text-light); font-size: 0.85rem;">Age</span>
+                <p style="font-weight: 600;">{{ user['age'] }} years</p>
+            </div>
+            {% endif %}
+            {% if user['gender'] %}
+            <div>
+                <span style="color: var(--text-light); font-size: 0.85rem;">Gender</span>
+                <p style="font-weight: 600;">{{ user['gender'] }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card health-id-card">
+        <h2>🆔 Health ID</h2>
+        <p class="health-id-value">{{ user['health_id'] }}</p>
+        <div class="qr-wrapper">
+            <img src="{{ url_for('static', filename=qr_path) }}" alt="Health ID QR">
+        </div>
+        <p class="help-text">Show this QR or ID at any hospital/doctor using this system.</p>
+    </div>
+</section>
+
+<section class="card mt-lg">
+    <div class="section-header">
+        <h2>🧾 Your Medical Records</h2>
+        <span class="badge">{{ records|length if records is defined else 0 }}</span>
+    </div>
+
+    {% if records %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Doctor</th>
+                    <th>Diagnosis</th>
+                    <th>Medicines</th>
+                    <th>Status</th>
+                    <th>Reports</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records %}
+                <tr>
+                    <td>{{ r['date'] }}</td>
+                    <td>
+                        <div style="font-weight: 800;">{{ r['doctor_name'] }}</div>
+                        <div class="help-text">{{ r['doctor_specialization'] or '-' }}</div>
+                    </td>
+                    <td>{{ r['diagnosis'] or '-' }}</td>
+                    <td>{{ r['medicines'] or '-' }}</td>
+                    <td>
+                        {% if 'treatment_status' in r.keys() and r['treatment_status'] %}
+                            <span class="badge">{{ r['treatment_status'] }}</span>
+                        {% else %}
+                            <span class="help-text">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap;">
+                            {% if 'blood_report_filename' in r.keys() and r['blood_report_filename'] %}
+                                <a class="btn small" href="{{ url_for('view_report', filename=r['blood_report_filename']) }}" target="_blank">View Blood</a>
+                                <a class="btn small" href="{{ url_for('download_report', filename=r['blood_report_filename']) }}">Download</a>
+                            {% endif %}
+                            {% if 'prescription_filename' in r.keys() and r['prescription_filename'] %}
+                                <a class="btn small" href="{{ url_for('view_report', filename=r['prescription_filename']) }}" target="_blank">View Rx</a>
+                                <a class="btn small" href="{{ url_for('download_report', filename=r['prescription_filename']) }}">Download</a>
+                            {% endif %}
+                            {% if ('blood_report_filename' not in r.keys() or not r['blood_report_filename']) and ('prescription_filename' not in r.keys() or not r['prescription_filename']) %}
+                                <span class="help-text">-</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="help-text">No records found yet.</p>
+    {% endif %}
+</section>
+
+<section class="card mt-lg">
+    <div class="section-header">
+        <h2>🚑 Your Emergencies</h2>
+        <span class="badge">{{ emergencies|length if emergencies is defined else 0 }}</span>
+    </div>
+
+    {% if emergencies %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Requested</th>
+                    <th>Location</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Assigned Hospital</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in emergencies %}
+                <tr>
+                    <td><span class="help-text">{{ e['requested_at'] }}</span></td>
+                    <td>{{ e['location'] or '-' }}</td>
+                    <td>
+                        {% if 'priority' in e.keys() and e['priority'] %}
+                            <span class="badge">{{ e['priority'] }}</span>
+                        {% else %}
+                            <span class="help-text">-</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ e['status'] or '-' }}</td>
+                    <td>{{ e['hospital_name'] or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="help-text">No emergency requests found yet.</p>
+    {% endif %}
+</section>
+
+<section class="card mt-lg">
+    <div class="section-header">
+        <h2>Hospitals You've Visited</h2>
+        <span class="badge">{{ hospitals|length if hospitals is defined else 0 }} hospitals</span>
+    </div>
+
+    {% if hospitals %}
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Hospital Name</th>
+            <th>Action</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for h in hospitals %}
+        <tr>
+            <td><strong>{{ h['name'] }}</strong></td>
+            <td>
+                <a href="{{ url_for('user_hospital_detail', hospital_id=h['hospital_id']) }}" class="btn primary small">👁️ View Details</a>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="help-text">You have not been treated at any hospital in this system yet.</p>
+    {% endif %}
+</section>
+
+{% endblock %}

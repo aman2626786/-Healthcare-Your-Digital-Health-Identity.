@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='chatbot.css') }}">
+    <script>
+        // Check theme immediately to prevent flashing
+        const savedTheme = localStorage.getItem('swasthya_theme');
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    </script>
+</head>
+<body>
+<header class="main-header">
+    <div class="container header-content">
+        <div class="brand">
+            <img src="{{ url_for('static', filename='logo/Screenshot 2025-12-13 165703.png') }}" alt="Swasthya SAMPARK Logo" class="brand-logo-image">
+        </div>
+        <nav class="main-nav">
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('health_admin_login') }}">Health Org</a>
+            <a href="{{ url_for('hospital_login') }}">Hospital</a>
+            <a href="{{ url_for('doctor_login') }}">Doctor</a>
+            <a href="{{ url_for('user_login') }}">User</a>
+            <button id="theme-toggle-btn" class="nav-theme-toggle" aria-label="Toggle Theme">
+                <svg viewBox="0 0 24 24" class="icon-sun"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06z"/></svg>
+                <svg viewBox="0 0 24 24" class="icon-moon" style="display: none;"><path d="M10 2c-1.82 0-3.53.5-5 1.35C7.99 5.08 10 8.3 10 12s-2.01 6.92-5 8.65C6.47 21.5 8.18 22 10 22c5.52 0 10-4.48 10-10S15.52 2 10 2z"/></svg>
+            </button>
+            <a href="{{ url_for('emergency') }}" class="nav-emergency">Emergency</a>
+        </nav>
+    </div>
+</header>
+
+<main class="main-content">
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-container">
+                {% for category, message in messages %}
+                    <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+</main>
+<footer class="main-footer">
+    <div class="container footer-content">
+        <span>Demo project</span>
+        <span>Built with Flask, SQLite, HTML, CSS, JS</span>
+    </div>
+</footer>
+
+<!-- Chatbot Widget Integration -->
+<button id="chatbot-toggle-btn" aria-label="Open AI Assistant">
+    <svg viewBox="0 0 24 24">
+        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+    </svg>
+</button>
+
+<div id="chatbot-window">
+    <div id="chatbot-header">
+        <h3>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1v.27A2 2 0 0 1 14 21a2 2 0 0 1-2 2 2 2 0 0 1-2-2c0-.74.4-1.39 1-1.73V19H10a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3h1V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2z"/>
+            </svg>
+            AI Assistant
+        </h3>
+        <button id="chatbot-close-btn">&times;</button>
+    </div>
+    
+    <div id="chatbot-messages">
+        <!-- Messages will be dynamically added here -->
+    </div>
+    
+    <div id="chatbot-input-container">
+        <input type="text" id="chatbot-input" placeholder="Ask a question..." autocomplete="off">
+        <button id="chatbot-send-btn" aria-label="Send Message">
+            <svg viewBox="0 0 24 24">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+        </button>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='chatbot.js') }}"></script>
+</body>
+</html>

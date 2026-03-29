@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% block title %}User Login{% endblock %}
+{% block content %}
+<div class="form-card narrow">
+    <form method="post" class="card form-card">
+        <h1>Patient Login</h1>
+        <p style="color: var(--text-light); margin-bottom: 1.5rem;">Access your health records and medical history</p>
+        
+        <!-- Login Type Toggle -->
+        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; background: var(--bg-light); padding: 0.5rem; border-radius: 8px;">
+            <label style="flex: 1; text-align: center; cursor: pointer;">
+                <input type="radio" name="login_type" value="password" id="radio-password" {% if not login_type or login_type == 'password' %}checked{% endif %} onchange="toggleLoginType()" style="margin-right: 0.5rem;">
+                Password
+            </label>
+            <label style="flex: 1; text-align: center; cursor: pointer;">
+                <input type="radio" name="login_type" value="otp" id="radio-otp" {% if login_type == 'otp' %}checked{% endif %} onchange="toggleLoginType()" style="margin-right: 0.5rem;">
+                OTP Login
+            </label>
+        </div>
+        
+        <!-- Password Login Form -->
+        <div id="password-form" style="display: {% if login_type == 'otp' %}none{% else %}block{% endif %};">
+            <div class="form-group">
+                <label for="identifier">Health ID</label>
+                <input type="text" id="identifier" name="identifier" required placeholder="e.g. H-1234-ABCD" value="{{ identifier or (demo.user_health_id if demo else '') }}">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required placeholder="Enter your password" value="{{ demo.user_password if demo else '' }}">
+            </div>
+            <button type="submit" class="btn primary full-width">Sign In</button>
+        </div>
+        
+        <!-- OTP Login Form -->
+        <div id="otp-form" style="display: {% if login_type == 'otp' %}block{% else %}none{% endif %};">
+            <div class="form-group">
+                <label for="otp_identifier">Health ID</label>
+                <input type="text" id="otp_identifier" name="identifier" required placeholder="e.g. H-1234-ABCD" value="{{ identifier or '' }}" {% if otp_sent %}readonly{% endif %}>
+            </div>
+            <div class="form-group">
+                <label for="otp_phone">Phone Number</label>
+                <input type="tel" id="otp_phone" name="phone" required placeholder="e.g. 916377429064" value="{{ phone or '' }}" {% if otp_sent %}readonly{% endif %}>
+            </div>
+            {% if otp_sent %}
+            <div class="form-group">
+                <label for="otp_code">Enter OTP</label>
+                <input type="text" id="otp_code" name="otp_code" required placeholder="Enter 6-digit OTP" maxlength="6" pattern="[0-9]{6}">
+                <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">OTP sent to your phone. Valid for 10 minutes.</small>
+                {% if otp_code %}
+                <div style="background: #e8f5e9; border: 2px solid #4caf50; border-radius: 8px; padding: 1rem; margin-top: 1rem; color: #2e7d32; font-weight: 600; text-align: center;">
+                    <div style="font-size: 1.2rem; margin-bottom: 0.5rem;">📱 Your OTP Code:</div>
+                    <div style="font-size: 2rem; letter-spacing: 0.5rem; font-weight: 700; color: #1b5e20;">{{ otp_code }}</div>
+                    <div style="font-size: 0.9rem; margin-top: 0.5rem; color: #388e3c;">Valid for 10 minutes</div>
+                </div>
+                {% elif otp_message %}
+                <div style="background: #e8f5e9; border: 2px solid #4caf50; border-radius: 8px; padding: 1rem; margin-top: 1rem; color: #2e7d32; font-weight: 600;">
+                    <strong>📱 {{ otp_message }}</strong>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            <button type="submit" class="btn primary full-width">
+                {% if otp_sent %}Verify OTP{% else %}Send OTP{% endif %}
+            </button>
+        </div>
+        
+        <p class="form-footnote" style="margin-top: 1rem;">
+            <a href="{{ url_for('user_forgot_password') }}" style="color: var(--primary); font-weight: 600;">Forgot Password?</a>
+            <span style="margin: 0 0.5rem;">|</span>
+            New user? 
+            <a href="{{ url_for('user_register') }}" style="color: var(--primary); font-weight: 600;">Create your Health ID</a>
+        </p>
+    </form>
+</div>
+
+<script>
+function toggleLoginType() {
+    const loginType = document.querySelector('input[name="login_type"]:checked').value;
+    const passwordForm = document.getElementById('password-form');
+    const otpForm = document.getElementById('otp-form');
+    
+    if (loginType === 'otp') {
+        passwordForm.style.display = 'none';
+        otpForm.style.display = 'block';
+        // Disable password form inputs
+        const passwordInputs = passwordForm.querySelectorAll('input, button');
+        passwordInputs.forEach(input => input.disabled = true);
+        // Enable OTP form inputs
+        const otpInputs = otpForm.querySelectorAll('input, button');
+        otpInputs.forEach(input => input.disabled = false);
+    } else {
+        passwordForm.style.display = 'block';
+        otpForm.style.display = 'none';
+        // Enable password form inputs
+        const passwordInputs = passwordForm.querySelectorAll('input, button');
+        passwordInputs.forEach(input => input.disabled = false);
+        // Disable OTP form inputs
+        const otpInputs = otpForm.querySelectorAll('input, button');
+        otpInputs.forEach(input => input.disabled = true);
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleLoginType();
+});
+</script>
+{% endblock %}

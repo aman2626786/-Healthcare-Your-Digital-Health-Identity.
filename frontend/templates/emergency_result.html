@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% block title %}Emergency Request Submitted{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>✅ Emergency Request Submitted</h1>
+</div>
+
+<div class="card">
+    <p style="font-size: 1.1rem; margin-bottom: 2rem;">Your emergency request has been recorded and an ambulance has been dispatched to your location.</p>
+    
+    <!-- Request Context -->
+    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem; border-left: 4px solid #007bff;">
+        <h2 style="margin-top: 0; margin-bottom: 1rem; color: #333; font-size: 1.2rem;">Request Context</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+            <div><strong>Location Zone:</strong> {{ zone or 'N/A' }}</div>
+            <div><strong>Day:</strong> {{ day or 'N/A' }}</div>
+            <div><strong>Time Slot:</strong> {{ time_slot or 'N/A' }}</div>
+            <div><strong>Emergency Type:</strong> {{ emergency_type or 'N/A' }}{% if emergency_type == 'EMS' %} (Medical){% endif %}</div>
+            <div><strong>Weather Condition:</strong> {{ weather or 'N/A' }}</div>
+            <div><strong>Active Requests:</strong> {{ active_requests or 0 }}</div>
+            <div><strong>Available Ambulances:</strong> {{ available_ambulances or 0 }}</div>
+        </div>
+    </div>
+    
+    <!-- Area Demand Forecast -->
+    <div style="background: #e7f3ff; padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem; border-left: 4px solid #2196F3;">
+        <h2 style="margin-top: 0; margin-bottom: 1rem; color: #333; font-size: 1.2rem;">🚑 Area Demand Forecast</h2>
+        <p style="margin-bottom: 0.5rem;"><strong>Predicted Demand Level:</strong> 
+            <span style="font-weight: 700; color: 
+                {% if demand_level == 'LOW' %}#10b981
+                {% elif demand_level == 'MEDIUM' %}#f59e0b
+                {% else %}#ef4444
+                {% endif %};">
+                {{ demand_level or 'MEDIUM' }}
+            </span>
+        </p>
+        <div style="margin-top: 1rem;">
+            <p style="margin-bottom: 0.5rem; font-weight: 600;">Model Explanation:</p>
+            <ul style="margin: 0; padding-left: 1.5rem;">
+                {% for factor in demand_factors %}
+                <li style="margin-bottom: 0.3rem;">{{ factor }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Emergency Severity Assessment -->
+    <div style="background: #fff3cd; padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem; border-left: 4px solid #ffc107;">
+        <h2 style="margin-top: 0; margin-bottom: 1rem; color: #333; font-size: 1.2rem;">🚨 Emergency Severity Assessment</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+            <div><strong>Reported Severity:</strong> {{ severity or 'Mild' }}</div>
+            <div><strong>Life Threat Risk:</strong> 
+                <span style="color: {% if life_threat_risk == 'Yes' %}#ef4444{% else %}#10b981{% endif %}; font-weight: 600;">
+                    {{ life_threat_risk or 'No' }}
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dispatch Priority Decision -->
+    <div style="background: 
+        {% if priority == 'Critical' %}rgba(239, 68, 68, 0.1)
+        {% elif priority == 'High' %}rgba(245, 158, 11, 0.1)
+        {% elif priority == 'Medium' %}rgba(251, 191, 36, 0.1)
+        {% else %}rgba(16, 185, 129, 0.1)
+        {% endif %}; 
+        padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem; border-left: 4px solid 
+        {% if priority == 'Critical' %}#ef4444
+        {% elif priority == 'High' %}#f59e0b
+        {% elif priority == 'Medium' %}#fbbf24
+        {% else %}#10b981
+        {% endif %};">
+        <h2 style="margin-top: 0; margin-bottom: 1rem; color: #333; font-size: 1.2rem;">⚙️ Dispatch Priority Decision</h2>
+        <p style="margin-bottom: 0.5rem;"><strong>Priority Level:</strong> 
+            <span style="font-weight: 700; color: 
+                {% if priority == 'Critical' %}#ef4444
+                {% elif priority == 'High' %}#f59e0b
+                {% elif priority == 'Medium' %}#fbbf24
+                {% else %}#10b981
+                {% endif %};">
+                {{ priority or 'Medium' }}
+            </span>
+        </p>
+        <div style="margin-top: 1rem;">
+            <p style="margin-bottom: 0.5rem; font-weight: 600;">Decision Logic:</p>
+            <ul style="margin: 0; padding-left: 1.5rem;">
+                {% for logic in decision_logic %}
+                <li style="margin-bottom: 0.3rem;">{{ logic }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Prediction Confidence -->
+    {% if prediction_probabilities %}
+    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem; border-left: 4px solid #6c757d;">
+        <h2 style="margin-top: 0; margin-bottom: 1rem; color: #333; font-size: 1.2rem;">📊 Prediction Confidence</h2>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+            <div>
+                <strong>Low:</strong> 
+                <span style="font-weight: 700; color: #10b981;">{{ prediction_probabilities.get('Low', 0)|round(1) }}%</span>
+            </div>
+            <div>
+                <strong>Medium:</strong> 
+                <span style="font-weight: 700; color: #fbbf24;">{{ prediction_probabilities.get('Medium', 0)|round(1) }}%</span>
+            </div>
+            <div>
+                <strong>High:</strong> 
+                <span style="font-weight: 700; color: #f59e0b;">{{ prediction_probabilities.get('High', 0)|round(1) }}%</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Dispatch Status -->
+    <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05)); padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem; border-left: 4px solid #10b981;">
+        <h2 style="margin-top: 0; margin-bottom: 1rem; color: #333; font-size: 1.2rem;">🚑 Dispatch Status</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem;">
+            <div><strong>Ambulance Dispatched:</strong> 
+                <span style="color: #10b981; font-weight: 600;">Yes</span>
+            </div>
+            <div><strong>Dispatch Type:</strong> {{ dispatch_type or 'Standard Priority' }}</div>
+            <div><strong>Estimated Arrival:</strong> 
+                <span style="font-weight: 700; color: #333;">{{ response_time or 15 }} minutes</span>
+            </div>
+        </div>
+        <div style="margin-top: 1rem;">
+            <p style="margin-bottom: 0.5rem; font-weight: 600;">Arrival Time Based On:</p>
+            <ul style="margin: 0; padding-left: 1.5rem;">
+                <li style="margin-bottom: 0.3rem;">Distance to nearest ambulance</li>
+                <li style="margin-bottom: 0.3rem;">Current traffic conditions</li>
+                <li style="margin-bottom: 0.3rem;">Priority level</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="button-row mt-md">
+        <a href="{{ url_for('index') }}" class="btn">← Back to Home</a>
+        <a href="{{ url_for('user_dashboard') }}" class="btn primary">Go to User Dashboard →</a>
+    </div>
+</div>
+{% endblock %}
