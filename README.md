@@ -2,7 +2,6 @@
 
 A comprehensive healthcare management system with AI-powered emergency response.
 
-DEMO = https://swasthya-sampark-0tds.onrender.com/
 
 ## Project Structure
 
