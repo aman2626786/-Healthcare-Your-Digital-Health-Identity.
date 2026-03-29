@@ -1934,6 +1934,54 @@ def doctor_scan_result(health_id):
     return render_template('doctor_dashboard.html', patient=patient, records=records, search_health_id=health_id, doctor_id=doctor_id, current_user_id=doctor_id)
 
 
+@app.route('/api/hospitals/nearby')
+def api_hospitals_nearby():
+    import math
+    try:
+        lat = float(request.args.get('lat', 0))
+        lng = float(request.args.get('lng', 0))
+    except ValueError:
+        return {'error': 'Invalid coordinates'}, 400
+        
+    if not lat or not lng:
+        return {'error': 'Missing coordinates'}, 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # Fetch all hospitals with coordinates and abha_connected
+    cur.execute('SELECT id, name, phone, district, state, latitude, longitude, abha_connected FROM hospitals WHERE latitude IS NOT NULL AND longitude IS NOT NULL')
+    hospitals = cur.fetchall()
+    conn.close()
+    
+    nearby = []
+    
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371  # Radius of earth in km
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = math.sin(dlat/2) * math.sin(dlat/2) + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2) * math.sin(dlon/2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        return R * c
+
+    for h in hospitals:
+        distance = haversine(lat, lng, h['latitude'], h['longitude'])
+        nearby.append({
+            'id': h['id'],
+            'name': h['name'],
+            'phone': h['phone'],
+            'district': h['district'],
+            'state': h['state'],
+            'distance': round(distance, 1),
+            'latitude': h['latitude'],
+            'longitude': h['longitude'],
+            'abha_connected': bool(h['abha_connected'])
+        })
+        
+    # Sort by distance and return top 15
+    nearby.sort(key=lambda x: x['distance'])
+    return {'hospitals': nearby[:15]}
+
+
 # Health Risk Prediction Function
 def predict_health_risk(user_data, symptoms, diagnosis, treatment_status, medicines, health_metrics=None):
     """
@@ -2707,13 +2755,18 @@ def hospital_register():
         password = request.form['password']
         state = request.form.get('state')
         district = request.form.get('district')
+        latitude = request.form.get('latitude')
+        if latitude: latitude = float(latitude)
+        longitude = request.form.get('longitude')
+        if longitude: longitude = float(longitude)
+        abha_connected = 1 if request.form.get('abha_connected') == 'on' else 0
 
         conn = get_db_connection()
         cur = conn.cursor()
         try:
             cur.execute(
-                'INSERT INTO hospitals (name, reg_no, email, password, state, district) VALUES (?, ?, ?, ?, ?, ?)',
-                (name, reg_no, email, password, state, district),
+                'INSERT INTO hospitals (name, reg_no, email, password, state, district, latitude, longitude, abha_connected) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                (name, reg_no, email, password, state, district, latitude, longitude, abha_connected),
             )
             conn.commit()
             flash('Hospital registered successfully. Please login.', 'success')
@@ -2849,6 +2902,11 @@ def hospital_profile():
         phone = request.form.get('phone', '').strip()
         state = request.form.get('state', '').strip() or None
         district = request.form.get('district', '').strip() or None
+        latitude = request.form.get('latitude')
+        if latitude: latitude = float(latitude)
+        longitude = request.form.get('longitude')
+        if longitude: longitude = float(longitude)
+        abha_connected = 1 if request.form.get('abha_connected') == 'on' else 0
         
         # Check if email is already taken by another hospital
         cur.execute('SELECT id FROM hospitals WHERE email = ? AND id != ?', (email, hospital_id))
@@ -2864,9 +2922,9 @@ def hospital_profile():
         try:
             cur.execute('''
                 UPDATE hospitals 
-                SET name = ?, email = ?, phone = ?, state = ?, district = ?
+                SET name = ?, email = ?, phone = ?, state = ?, district = ?, latitude = ?, longitude = ?, abha_connected = ?
                 WHERE id = ?
-            ''', (name, email, phone, state, district, hospital_id))
+            ''', (name, email, phone, state, district, latitude, longitude, abha_connected, hospital_id))
             conn.commit()
             flash('Profile updated successfully', 'success')
             conn.close()

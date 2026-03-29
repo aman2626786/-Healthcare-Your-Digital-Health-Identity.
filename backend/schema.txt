@@ -1,0 +1,193 @@
+CREATE TABLE hospitals (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   name TEXT NOT NULL,
+                   reg_no TEXT UNIQUE NOT NULL,
+                   email TEXT UNIQUE NOT NULL,
+                   password TEXT NOT NULL,
+                   state TEXT,
+                   district TEXT
+               , phone TEXT)
+---
+CREATE TABLE sqlite_sequence(name,seq)
+---
+CREATE TABLE doctors (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   hospital_id INTEGER NOT NULL,
+                   name TEXT NOT NULL,
+                   email TEXT UNIQUE NOT NULL,
+                   password TEXT NOT NULL,
+                   specialization TEXT, phone TEXT,
+                   FOREIGN KEY(hospital_id) REFERENCES hospitals(id)
+               )
+---
+CREATE TABLE users (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   name TEXT NOT NULL,
+                   email TEXT UNIQUE NOT NULL,
+                   password TEXT NOT NULL,
+                   phone TEXT,
+                   address TEXT,
+                   health_id TEXT UNIQUE NOT NULL,
+                   age INTEGER,
+                   gender TEXT
+               , blood_group TEXT, emergency_contact TEXT, emergency_contact_name TEXT)
+---
+CREATE TABLE records (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   user_id INTEGER NOT NULL,
+                   doctor_id INTEGER NOT NULL,
+                   date TEXT NOT NULL,
+                   symptoms TEXT,
+                   diagnosis TEXT,
+                   medicines TEXT,
+                   dosage TEXT,
+                   treatment_status TEXT,
+                   consultation_duration INTEGER,
+                   prescription_text TEXT,
+                   prescription_filename TEXT,
+                   blood_report_filename TEXT,
+                   report_filename TEXT,
+                   created_at TEXT NOT NULL,
+                   risk_level TEXT,
+                   risk_score REAL, blood_report_file TEXT, prescription_file TEXT, systolic_bp INTEGER, diastolic_bp INTEGER, bmi REAL, cholesterol REAL, glucose REAL, smoking TEXT, alcohol TEXT, physical_activity TEXT, family_history TEXT,
+                   FOREIGN KEY(user_id) REFERENCES users(id),
+                   FOREIGN KEY(doctor_id) REFERENCES doctors(id)
+               )
+---
+CREATE TABLE emergencies (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   user_id INTEGER,
+                   name TEXT,
+                   phone TEXT,
+                   location TEXT NOT NULL,
+                   status TEXT NOT NULL,
+                   requested_at TEXT NOT NULL,
+                   response_time_minutes INTEGER
+               , priority TEXT, hospital_id INTEGER, assigned_at TEXT, district TEXT, seen_by_hospital INTEGER DEFAULT 0, symptoms TEXT, severity TEXT, prediction_score REAL, age INTEGER, state TEXT, zone TEXT, day TEXT, time_slot TEXT, emergency_type TEXT, weather TEXT)
+---
+CREATE TABLE otp_codes (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   phone TEXT NOT NULL,
+                   code TEXT NOT NULL,
+                   role TEXT NOT NULL,
+                   identifier TEXT NOT NULL,
+                   purpose TEXT NOT NULL,
+                   created_at TEXT NOT NULL,
+                   expires_at TEXT NOT NULL,
+                   verified INTEGER DEFAULT 0
+               )
+---
+CREATE TABLE health_admins (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   email TEXT UNIQUE NOT NULL,
+                   password TEXT NOT NULL
+               )
+---
+CREATE TABLE inventory_items (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   hospital_id INTEGER NOT NULL,
+                   item_name TEXT NOT NULL,
+                   medicine_type TEXT,
+                   strength_mg REAL,
+                   category TEXT,
+                   quantity INTEGER NOT NULL DEFAULT 0,
+                   unit TEXT,
+                   reorder_level INTEGER NOT NULL DEFAULT 0,
+                   last_updated TEXT NOT NULL,
+                   notes TEXT,
+                   UNIQUE(hospital_id, item_name),
+                   FOREIGN KEY(hospital_id) REFERENCES hospitals(id)
+               )
+---
+CREATE TABLE staff (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   hospital_id INTEGER NOT NULL,
+                   name TEXT NOT NULL,
+                   email TEXT UNIQUE NOT NULL,
+                   password TEXT NOT NULL,
+                   role_title TEXT,
+                   FOREIGN KEY(hospital_id) REFERENCES hospitals(id)
+               )
+---
+CREATE TABLE staff_tasks (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   hospital_id INTEGER NOT NULL,
+                   staff_id INTEGER,
+                   title TEXT NOT NULL,
+                   status TEXT NOT NULL DEFAULT 'Pending',
+                   due_date TEXT,
+                   created_at TEXT NOT NULL,
+                   FOREIGN KEY(hospital_id) REFERENCES hospitals(id),
+                   FOREIGN KEY(staff_id) REFERENCES staff(id)
+               )
+---
+CREATE TABLE staff_activity_log (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   hospital_id INTEGER NOT NULL,
+                   staff_id INTEGER NOT NULL,
+                   action TEXT NOT NULL,
+                   details TEXT,
+                   created_at TEXT NOT NULL,
+                   FOREIGN KEY(hospital_id) REFERENCES hospitals(id),
+                   FOREIGN KEY(staff_id) REFERENCES staff(id)
+               )
+---
+CREATE TABLE patient_status (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   hospital_id INTEGER NOT NULL,
+                   user_id INTEGER NOT NULL,
+                   status TEXT NOT NULL,
+                   updated_by_staff_id INTEGER,
+                   updated_at TEXT NOT NULL,
+                   UNIQUE(hospital_id, user_id),
+                   FOREIGN KEY(hospital_id) REFERENCES hospitals(id),
+                   FOREIGN KEY(user_id) REFERENCES users(id),
+                   FOREIGN KEY(updated_by_staff_id) REFERENCES staff(id)
+               )
+---
+CREATE TABLE medicine_administration (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   hospital_id INTEGER NOT NULL,
+                   record_id INTEGER NOT NULL,
+                   medicine_name TEXT NOT NULL,
+                   status TEXT NOT NULL DEFAULT 'Pending',
+                   updated_by_staff_id INTEGER,
+                   updated_at TEXT NOT NULL,
+                   UNIQUE(record_id, medicine_name),
+                   FOREIGN KEY(hospital_id) REFERENCES hospitals(id),
+                   FOREIGN KEY(record_id) REFERENCES records(id),
+                   FOREIGN KEY(updated_by_staff_id) REFERENCES staff(id)
+               )
+---
+CREATE TABLE beds (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   hospital_id INTEGER NOT NULL,
+                   bed_number TEXT NOT NULL,
+                   ward TEXT,
+                   bed_type TEXT,
+                   status TEXT NOT NULL DEFAULT 'Available',
+                   notes TEXT,
+                   created_at TEXT NOT NULL,
+                   updated_at TEXT NOT NULL,
+                   UNIQUE(hospital_id, bed_number),
+                   FOREIGN KEY(hospital_id) REFERENCES hospitals(id)
+               )
+---
+CREATE TABLE admissions (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   hospital_id INTEGER NOT NULL,
+                   user_id INTEGER NOT NULL,
+                   bed_id INTEGER,
+                   status TEXT NOT NULL DEFAULT 'Active',
+                   reason TEXT,
+                   admitted_at TEXT NOT NULL,
+                   discharged_at TEXT,
+                   created_by_staff_id INTEGER,
+                   discharged_by_staff_id INTEGER,
+                   FOREIGN KEY(hospital_id) REFERENCES hospitals(id),
+                   FOREIGN KEY(user_id) REFERENCES users(id),
+                   FOREIGN KEY(bed_id) REFERENCES beds(id),
+                   FOREIGN KEY(created_by_staff_id) REFERENCES staff(id),
+                   FOREIGN KEY(discharged_by_staff_id) REFERENCES staff(id)
+               )
+---

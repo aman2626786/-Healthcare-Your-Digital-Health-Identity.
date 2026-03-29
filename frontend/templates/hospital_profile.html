@@ -39,7 +39,31 @@
             </div>
         </div>
         
-        <div class="form-group" style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+        <div class="form-group location-group" style="padding: 1.5rem; background: var(--bg-light); border-radius: 12px; border: 1px solid var(--border); margin-top: 1rem;">
+            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem;">Hospital Location</label>
+            <p style="font-size: 0.85rem; color: var(--text-light); margin-bottom: 1rem;">Required to help patients locate your hospital during emergencies.</p>
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group" style="flex: 1; margin: 0;">
+                    <label for="latitude" style="font-size: 0.9rem;">Latitude</label>
+                    <input type="number" step="any" id="latitude" name="latitude" required placeholder="e.g. 28.6139" value="{{ hospital.latitude or '' }}">
+                </div>
+                <div class="form-group" style="flex: 1; margin: 0;">
+                    <label for="longitude" style="font-size: 0.9rem;">Longitude</label>
+                    <input type="number" step="any" id="longitude" name="longitude" required placeholder="e.g. 77.2090" value="{{ hospital.longitude or '' }}">
+                </div>
+            </div>
+            <button type="button" class="btn secondary" id="getLocationBtn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: white;">
+                📍 Autofil Current Live Location
+            </button>
+            <div id="locationStatus" style="font-size: 0.85rem; margin-top: 0.5rem; display: none;"></div>
+        </div>
+        
+        <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+            <input type="checkbox" id="abha_connected" name="abha_connected" {% if hospital.abha_connected %}checked{% endif %} style="width: 18px; height: 18px; cursor: pointer;">
+            <label for="abha_connected" style="margin: 0; cursor: pointer;">This hospital is registered with ABHA (Ayushman Bharat Health Account)</label>
+        </div>
+        
+        <div class="form-group" style="background: var(--bg-light); padding: 1rem; border-radius: 8px; margin-top: 1.5rem;">
             <label style="color: var(--text-light); font-size: 0.9rem;">Registration Number</label>
             <p style="font-weight: 600; font-size: 1.1rem; margin-top: 0.5rem;">{{ hospital['reg_no'] }}</p>
             <small style="color: var(--text-light);">Registration number cannot be changed</small>
@@ -51,5 +75,29 @@
         </div>
     </form>
 </div>
+
+<script>
+document.getElementById('getLocationBtn').addEventListener('click', function() {
+    const status = document.getElementById('locationStatus');
+    status.style.display = 'block';
+    status.style.color = 'var(--text-dark)';
+    status.innerText = 'Fetching live location... please wait.';
+    
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            document.getElementById('latitude').value = position.coords.latitude;
+            document.getElementById('longitude').value = position.coords.longitude;
+            status.style.color = 'var(--success)';
+            status.innerText = '✓ Location updated successfully!';
+        }, function(error) {
+            status.style.color = 'var(--danger)';
+            status.innerText = '✗ Error getting location. Please ensure location permissions are granted.';
+        }, { enableHighAccuracy: true });
+    } else {
+        status.style.color = 'var(--danger)';
+        status.innerText = '✗ Geolocation is not supported by your browser. Please enter manually.';
+    }
+});
+</script>
 {% endblock %}
 

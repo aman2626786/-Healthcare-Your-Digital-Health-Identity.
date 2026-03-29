@@ -53,7 +53,27 @@
                     <span>Call {% if patient['emergency_contact_name'] %}{{ patient['emergency_contact_name'] }}{% else %}Relative{% endif %}</span>
                 </a>
             </div>
+            </div>
             {% endif %}
+
+            <!-- Nearby Hospitals Block -->
+            <div class="emergency-contact nearby-hospitals" style="background: var(--bg-card); border: 1px solid var(--border); padding: 1.5rem; border-radius: 16px; margin: 0; margin-top: 1rem;">
+                <h3 style="color: var(--text-dark); margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">🏥 Nearby Hospitals</h3>
+                <p style="color: var(--text-light); margin-bottom: 1rem; font-size: 0.95rem;">Find the closest hospitals registered on Swasthya-Sampark and Google Maps.</p>
+                
+                <button id="findHospitalsBtn" class="btn primary emergency-call-btn" style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); margin-top: 0; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                    <span>Locate Nearby Hospitals</span>
+                </button>
+                
+                <div id="hospitalsLoader" style="display: none; padding: 1rem; text-align: center; color: var(--text-light); font-size: 0.9rem;">
+                    Fetching location...
+                </div>
+
+                <div id="hospitalsList" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.8rem;">
+                    <!-- Hospital cards will be injected here -->
+                </div>
+            </div>
         </div>
 
         <div class="emergency-footer">
@@ -145,5 +165,122 @@
     50% { transform: scale(1.1); }
     100% { transform: scale(1); }
 }
+.hospital-card {
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: left;
+}
+.hospital-card h4 {
+    margin: 0 0 0.3rem 0;
+    color: var(--text-dark);
+    font-size: 1.1rem;
+}
+.hospital-card p {
+    margin: 0;
+    color: var(--text-light);
+    font-size: 0.85rem;
+}
+.hospital-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+.hospital-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+}
+.hospital-actions a {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+.btn-call {
+    background: var(--primary);
+    color: white !important;
+}
+.btn-directions {
+    background: var(--bg-light);
+    border: 1px solid var(--border);
+    color: var(--text-dark) !important;
+}
 </style>
+
+<script>
+document.getElementById('findHospitalsBtn').addEventListener('click', function() {
+    const btn = this;
+    const loader = document.getElementById('hospitalsLoader');
+    const list = document.getElementById('hospitalsList');
+    
+    btn.style.display = 'none';
+    loader.style.display = 'block';
+    list.innerHTML = '';
+    
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            loader.innerText = 'Finding hospitals nearby...';
+            
+            fetch(`/api/hospitals/nearby?lat=${lat}&lng=${lng}`)
+                .then(res => res.json())
+                .then(data => {
+                    loader.style.display = 'none';
+                    if (data.hospitals && data.hospitals.length > 0) {
+                        data.hospitals.forEach(h => {
+                            let abhaBadge = h.abha_connected ? '<span class="hospital-badge">ABHA Connected ✅</span>' : '';
+                            let card = `
+                                <div class="hospital-card">
+                                    ${abhaBadge}
+                                    <h4>${h.name}</h4>
+                                    <p>Distance: <strong>${h.distance} km</strong> | ${h.district}, ${h.state}</p>
+                                    <div class="hospital-actions">
+                                        <a href="tel:${h.phone}" class="btn-call">📞 Call</a>
+                                        <a href="https://maps.google.com/?q=${h.latitude},${h.longitude}" target="_blank" class="btn-directions">📍 Directions</a>
+                                    </div>
+                                </div>
+                            `;
+                            list.insertAdjacentHTML('beforeend', card);
+                        });
+                    } else {
+                        list.innerHTML = '<p style="color: var(--text-light); font-size: 0.9rem;">No Swasthya-Sampark registered hospitals found nearby.</p>';
+                    }
+                    
+                    // Always append a general Google Maps search button
+                    list.insertAdjacentHTML('beforeend', `
+                        <a href="https://www.google.com/maps/search/hospitals/@${lat},${lng},14z" target="_blank" class="btn secondary" style="margin-top: 0.5rem; display: block; text-align: center; width: 100%; border: 1px solid #d1d5db; background: white; color: #374151;">
+                            Explore all Hospitals on Google Maps 🗺️
+                        </a>
+                    `);
+                    
+                })
+                .catch(err => {
+                    loader.style.display = 'none';
+                    list.innerHTML = `<p style="color: var(--danger); font-size: 0.9rem;">Error fetching hospitals. <a href="https://www.google.com/maps/search/hospitals/@${lat},${lng},14z" target="_blank" style="color: var(--primary);">View on Map instead</a></p>`;
+                });
+                
+        }, function(error) {
+            loader.style.display = 'none';
+            btn.style.display = 'flex';
+            alert("Could not get your location. Please ensure location permissions are granted.");
+        }, { enableHighAccuracy: true });
+    } else {
+        loader.style.display = 'none';
+        btn.style.display = 'flex';
+        alert("Geolocation is not supported by your browser.");
+    }
+});
+</script>
 {% endblock %}

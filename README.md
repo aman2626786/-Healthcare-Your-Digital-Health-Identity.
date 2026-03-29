@@ -74,6 +74,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
   - Interactive In-App HTML5 Camera Scanner native to the User Dashboard.
   - Role-based privacy (Bystanders see only critical details like Blood Group & Emergency Contacts; Doctors see full medical history).
   - Customizable Emergency Contact mapping and universal quick-dial buttons (e.g. 112/108).
+  - **Live Nearest Hospitals Locator**: Automatically tracks the user's GPS location via the browser and finds the closest ABHA-connected hospitals natively via a Haversine distance backend API, with one-tap fallbacks for Google Maps navigation.
 - **ML Models**: 
   - SVM Health Risk Prediction Model
   - Logistic Regression Emergency Priority Model
