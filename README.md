@@ -69,6 +69,11 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
 - **Doctor Dashboard**: Medical record management, AI risk assessment
 - **Hospital Dashboard**: Patient management, analytics
 - **Emergency System**: AI-powered emergency priority prediction
+- **Intelligent QR Emergency System**: 
+  - Scan Health ID QR cards to immediately fetch critically required patient stats.
+  - Interactive In-App HTML5 Camera Scanner native to the User Dashboard.
+  - Role-based privacy (Bystanders see only critical details like Blood Group & Emergency Contacts; Doctors see full medical history).
+  - Customizable Emergency Contact mapping and universal quick-dial buttons (e.g. 112/108).
 - **ML Models**: 
   - SVM Health Risk Prediction Model
   - Logistic Regression Emergency Priority Model
