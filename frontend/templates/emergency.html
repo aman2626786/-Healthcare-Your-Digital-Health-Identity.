@@ -1,145 +1,388 @@
 {% extends 'base.html' %}
-{% block title %}Emergency Request{% endblock %}
+{% block title %}Emergency Dispatch{% endblock %}
 {% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
 <div class="page-header">
-    <h1>🚑 Emergency Ambulance Request</h1>
+    <div>
+        <h1>Emergency Live Dispatch</h1>
+        <p class="help-text">Rapido-style flow: open map, find nearest ambulance, and dispatch instantly.</p>
+    </div>
 </div>
 
-<div class="form-card narrow">
-    <form method="post" class="card form-card">
-        <p class="help-text" style="color: var(--danger); font-weight: 600; margin-bottom: 1rem;">⚠️ This form will dispatch an ambulance to your location. Fill in your details quickly.</p>
-        
-        <div class="form-group">
-            <label for="location">Current Location / Landmark <span style="color: var(--danger);">*</span></label>
-            <textarea id="location" name="location" rows="2" required placeholder="e.g., Near City Mall, Gate 2, Bengaluru"></textarea>
-        </div>
-        
-        <div class="form-group">
-            <label for="symptoms">Symptoms / Emergency Description <span style="color: var(--danger);">*</span></label>
-            <textarea id="symptoms" name="symptoms" rows="3" required placeholder="Describe the symptoms or emergency situation (e.g., chest pain, difficulty breathing, accident, etc.)"></textarea>
-            <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">AI will analyze this to determine priority level</small>
-        </div>
-        
-        <div class="form-group">
-            <label for="emergency_type">Emergency Type <span style="color: var(--danger);">*</span></label>
-            <select id="emergency_type" name="emergency_type" required>
-                <option value="">Select Emergency Type</option>
-                <option value="EMS">EMS (Medical Emergency)</option>
-                <option value="Traffic">Traffic Accident</option>
-                <option value="Fire">Fire Emergency</option>
-            </select>
-        </div>
+<section class="grid" style="grid-template-columns:minmax(320px, 1fr) minmax(0, 1.4fr); gap:1rem;">
+    <div class="card">
+        <h2 style="margin-top:0;">Nearest Ambulances</h2>
+        <p class="help-text" id="amb-meta">Tap "Use My Live Location" to start live matching.</p>
+        <div id="nearby-ambulances" style="display:grid; gap:0.55rem;"></div>
+    </div>
 
-        <div class="form-group">
-            <label for="district">District / City</label>
-            <input type="text" id="district" name="district" placeholder="e.g., Jaipur, Bengaluru Urban">
-            <small style="color: var(--text-light); margin-top: 0.5rem; display: block;">Helps assign the nearest available hospital.</small>
-        </div>
-        
-        <div class="form-group">
-            <label for="state">State <span style="color: var(--danger);">*</span></label>
-            <select id="state" name="state" required>
-                <option value="">Select State</option>
-                <option value="All India">All India</option>
-                <option value="Uttar Pradesh">Uttar Pradesh</option>
-                <option value="Maharashtra">Maharashtra</option>
-                <option value="West Bengal">West Bengal</option>
-                <option value="Jharkhand">Jharkhand</option>
-                <option value="Madhya Pradesh">Madhya Pradesh</option>
-                <option value="Bihar">Bihar</option>
-                <option value="Rajasthan">Rajasthan</option>
-                <option value="Tamil Nadu">Tamil Nadu</option>
-                <option value="Orissa">Orissa</option>
-                <option value="Assam">Assam</option>
-                <option value="Karnataka">Karnataka</option>
-                <option value="Andhra Pradesh">Andhra Pradesh</option>
-                <option value="Haryana">Haryana</option>
-                <option value="Chhatisgarh">Chhatisgarh</option>
-                <option value="Jammu and Kashmir">Jammu and Kashmir</option>
-                <option value="Telangana">Telangana</option>
-                <option value="Uttarakhand">Uttarakhand</option>
-                <option value="Himachal Pradesh">Himachal Pradesh</option>
-                <option value="Gujarat">Gujarat</option>
-                <option value="Kerala">Kerala</option>
-                <option value="Arunachal Pradesh">Arunachal Pradesh</option>
-                <option value="Delhi">Delhi</option>
-                <option value="Nagaland">Nagaland</option>
-                <option value="Mizoram">Mizoram</option>
-                <option value="Meghalaya">Meghalaya</option>
-                <option value="Tripura">Tripura</option>
-                <option value="Manipur">Manipur</option>
-                <option value="Goa">Goa</option>
-                <option value="Andaman and Nicobar Island">Andaman and Nicobar Island</option>
-                <option value="Ladakh">Ladakh</option>
-                <option value="Sikkim">Sikkim</option>
-                <option value="Puducherry">Puducherry</option>
-                <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
-                <option value="Chandigarh">Chandigarh</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="zone">Zone <span style="color: var(--danger);">*</span></label>
-            <select id="zone" name="zone" required>
-                <option value="">Select Zone</option>
-                <option value="Urban">Urban</option>
-                <option value="Rural">Rural</option>
-                <option value="Highway">Highway</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="day">Day</label>
-            <select id="day" name="day">
-                <option value="">Auto-detect (Current Day)</option>
-                <option value="Monday">Monday</option>
-                <option value="Tuesday">Tuesday</option>
-                <option value="Wednesday">Wednesday</option>
-                <option value="Thursday">Thursday</option>
-                <option value="Friday">Friday</option>
-                <option value="Saturday">Saturday</option>
-                <option value="Sunday">Sunday</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="time_slot">Time Slot</label>
-            <select id="time_slot" name="time_slot">
-                <option value="">Auto-detect (Current Time)</option>
-                <option value="Morning">Morning</option>
-                <option value="Afternoon">Afternoon</option>
-                <option value="Evening">Evening</option>
-                <option value="Night">Night</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="weather">Weather Condition</label>
-            <select id="weather" name="weather">
-                <option value="">Select Weather</option>
-                <option value="Clear">Clear</option>
-                <option value="Rain">Rain</option>
-                <option value="Fog">Fog</option>
-                <option value="Heatwave">Heatwave</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="name">Patient Name</label>
-            <input type="text" id="name" name="name" placeholder="Your name or patient name">
-        </div>
-        
-        <div class="form-group">
-            <label for="age">Patient Age</label>
-            <input type="number" id="age" name="age" min="0" max="120" placeholder="Age (optional, helps AI assess priority)">
-        </div>
-        
-        <div class="form-group">
-            <label for="phone">Contact Phone <span style="color: var(--danger);">*</span></label>
-            <input type="text" id="phone" name="phone" required placeholder="10-digit phone number">
-        </div>
-        
-        <button type="submit" class="btn danger full-width">🚑 Request Ambulance Now</button>
-    </form>
-</div>
+    <div class="card">
+        <div id="dispatch-map" style="height:320px; border-radius:12px; border:1px solid var(--border); margin-bottom:0.9rem;"></div>
+        <form method="post" id="emergency-form">
+            <input type="hidden" id="patient_latitude" name="patient_latitude">
+            <input type="hidden" id="patient_longitude" name="patient_longitude">
+            <input type="hidden" id="preferred_ambulance_id" name="preferred_ambulance_id">
+
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.9rem;">
+                <button type="button" class="btn small" data-etype="EMS">Medical Emergency</button>
+                <button type="button" class="btn small" data-etype="Traffic">Road Accident</button>
+                <button type="button" class="btn small" data-etype="Fire">Fire Emergency</button>
+                <button type="button" class="btn small primary" id="btn-live-location">Use My Live Location</button>
+            </div>
+
+            <div class="form-group">
+                <label for="location">Current Location / Landmark <span style="color:var(--danger);">*</span></label>
+                <textarea id="location" name="location" rows="2" required placeholder="e.g., Near City Mall, Gate 2, Bengaluru"></textarea>
+                <small id="live-location-status" class="help-text" style="margin-top:0.45rem; display:block;"></small>
+                <small class="help-text" style="display:block;">Tip: Enable precise location in browser/phone settings. You can also tap on map to set exact pin.</small>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.7rem;">
+                <div class="form-group">
+                    <label for="phone">Contact Phone <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="phone" name="phone" required placeholder="10-digit phone number">
+                </div>
+                <div class="form-group">
+                    <label for="name">Patient Name</label>
+                    <input type="text" id="name" name="name" placeholder="Name (optional)">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="symptoms">Symptoms / Situation <span style="color:var(--danger);">*</span></label>
+                <textarea id="symptoms" name="symptoms" rows="3" required placeholder="e.g., chest pain, breathing difficulty, bleeding, accident trauma"></textarea>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.7rem;">
+                <div class="form-group">
+                    <label for="emergency_type">Emergency Type <span style="color:var(--danger);">*</span></label>
+                    <select id="emergency_type" name="emergency_type" required>
+                        <option value="">Select</option>
+                        <option value="EMS">EMS (Medical)</option>
+                        <option value="Traffic">Traffic</option>
+                        <option value="Fire">Fire</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="age">Patient Age</label>
+                    <input type="number" id="age" name="age" min="0" max="120" placeholder="Optional">
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.7rem;">
+                <div class="form-group">
+                    <label for="district">District / City</label>
+                    <input type="text" id="district" name="district" placeholder="e.g., Jaipur">
+                </div>
+                <div class="form-group">
+                    <label for="state">State <span style="color:var(--danger);">*</span></label>
+                    <select id="state" name="state" required>
+                        <option value="">Select State</option>
+                        <option value="All India">All India</option>
+                        <option value="Uttar Pradesh">Uttar Pradesh</option>
+                        <option value="Maharashtra">Maharashtra</option>
+                        <option value="West Bengal">West Bengal</option>
+                        <option value="Jharkhand">Jharkhand</option>
+                        <option value="Madhya Pradesh">Madhya Pradesh</option>
+                        <option value="Bihar">Bihar</option>
+                        <option value="Rajasthan">Rajasthan</option>
+                        <option value="Tamil Nadu">Tamil Nadu</option>
+                        <option value="Orissa">Orissa</option>
+                        <option value="Assam">Assam</option>
+                        <option value="Karnataka">Karnataka</option>
+                        <option value="Andhra Pradesh">Andhra Pradesh</option>
+                        <option value="Haryana">Haryana</option>
+                        <option value="Chhatisgarh">Chhatisgarh</option>
+                        <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+                        <option value="Telangana">Telangana</option>
+                        <option value="Uttarakhand">Uttarakhand</option>
+                        <option value="Himachal Pradesh">Himachal Pradesh</option>
+                        <option value="Gujarat">Gujarat</option>
+                        <option value="Kerala">Kerala</option>
+                        <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+                        <option value="Delhi">Delhi</option>
+                        <option value="Nagaland">Nagaland</option>
+                        <option value="Mizoram">Mizoram</option>
+                        <option value="Meghalaya">Meghalaya</option>
+                        <option value="Tripura">Tripura</option>
+                        <option value="Manipur">Manipur</option>
+                        <option value="Goa">Goa</option>
+                        <option value="Andaman and Nicobar Island">Andaman and Nicobar Island</option>
+                        <option value="Ladakh">Ladakh</option>
+                        <option value="Sikkim">Sikkim</option>
+                        <option value="Puducherry">Puducherry</option>
+                        <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
+                        <option value="Chandigarh">Chandigarh</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="zone">Zone <span style="color:var(--danger);">*</span></label>
+                    <select id="zone" name="zone" required>
+                        <option value="">Select Zone</option>
+                        <option value="Urban">Urban</option>
+                        <option value="Rural">Rural</option>
+                        <option value="Highway">Highway</option>
+                    </select>
+                </div>
+            </div>
+
+            <details style="margin:0.35rem 0 1rem 0;">
+                <summary style="cursor:pointer; color:var(--primary); font-weight:700;">Advanced Context (optional)</summary>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.7rem; margin-top:0.6rem;">
+                    <div class="form-group">
+                        <label for="day">Day</label>
+                        <select id="day" name="day">
+                            <option value="">Auto</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="time_slot">Time Slot</label>
+                        <select id="time_slot" name="time_slot">
+                            <option value="">Auto</option>
+                            <option value="Morning">Morning</option>
+                            <option value="Afternoon">Afternoon</option>
+                            <option value="Evening">Evening</option>
+                            <option value="Night">Night</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="weather">Weather</label>
+                        <select id="weather" name="weather">
+                            <option value="">Select</option>
+                            <option value="Clear">Clear</option>
+                            <option value="Rain">Rain</option>
+                            <option value="Fog">Fog</option>
+                            <option value="Heatwave">Heatwave</option>
+                        </select>
+                    </div>
+                </div>
+            </details>
+
+            <button type="submit" class="btn danger full-width" style="font-size:1rem; padding:0.85rem 1rem;">
+                Send SOS and Allocate Ambulance
+            </button>
+        </form>
+    </div>
+</section>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const btnLive = document.getElementById('btn-live-location');
+    const statusEl = document.getElementById('live-location-status');
+    const locationField = document.getElementById('location');
+    const latField = document.getElementById('patient_latitude');
+    const lngField = document.getElementById('patient_longitude');
+    const prefAmbField = document.getElementById('preferred_ambulance_id');
+    const districtField = document.getElementById('district');
+    const stateField = document.getElementById('state');
+    const emergencyType = document.getElementById('emergency_type');
+    const listEl = document.getElementById('nearby-ambulances');
+    const metaEl = document.getElementById('amb-meta');
+
+    const map = L.map('dispatch-map').setView([20.5937, 78.9629], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let userMarker = null;
+    let ambulanceMarkers = [];
+    let bestFix = null;
+
+    function clearAmbulanceMarkers() {
+        ambulanceMarkers.forEach(function (m) { map.removeLayer(m); });
+        ambulanceMarkers = [];
+    }
+
+    function updateUserLocation(lat, lng, accuracyMeters, sourceLabel) {
+        latField.value = lat;
+        lngField.value = lng;
+
+        const existing = (locationField.value || '').trim();
+        if (!existing || existing.toLowerCase().startsWith('live gps:') || existing.toLowerCase().startsWith('manual pin:')) {
+            const prefix = sourceLabel === 'manual' ? 'Manual pin: ' : 'Live GPS: ';
+            locationField.value = prefix + Number(lat).toFixed(6) + ', ' + Number(lng).toFixed(6);
+        }
+
+        if (userMarker) map.removeLayer(userMarker);
+        userMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
+        userMarker.bindPopup('Your selected emergency location').openPopup();
+        userMarker.on('dragend', function (ev) {
+            const p = ev.target.getLatLng();
+            updateUserLocation(p.lat, p.lng, null, 'manual');
+            statusEl.textContent = 'Location updated by map pin.';
+            statusEl.style.color = 'var(--success)';
+            fetchNearbyAmbulances();
+        });
+
+        map.setView([lat, lng], 15);
+        if (accuracyMeters && Number.isFinite(accuracyMeters)) {
+            statusEl.textContent = 'Live location captured (' + Math.round(accuracyMeters) + 'm accuracy).';
+        } else {
+            statusEl.textContent = 'Location selected on map.';
+        }
+        statusEl.style.color = 'var(--success)';
+    }
+
+    function setPreferredAmbulance(id, cardEl) {
+        prefAmbField.value = id || '';
+        document.querySelectorAll('.amb-card').forEach(function (el) {
+            el.style.borderColor = 'var(--border)';
+            el.style.background = 'var(--bg-light)';
+        });
+        if (cardEl) {
+            cardEl.style.borderColor = '#16a34a';
+            cardEl.style.background = 'rgba(22,163,74,0.08)';
+        }
+    }
+
+    function renderAmbulances(items) {
+        listEl.innerHTML = '';
+        clearAmbulanceMarkers();
+        if (!items || !items.length) {
+            listEl.innerHTML = '<p class="help-text">No available ambulance units found right now.</p>';
+            prefAmbField.value = '';
+            return;
+        }
+
+        items.forEach(function (a, idx) {
+            const eta = a.distance_km !== null && a.distance_km !== undefined
+                ? Math.max(4, Math.round(a.distance_km * 2.2 + 4))
+                : null;
+            const card = document.createElement('div');
+            card.className = 'amb-card';
+            card.style.border = '1px solid var(--border)';
+            card.style.borderRadius = '10px';
+            card.style.padding = '0.65rem';
+            card.style.background = 'var(--bg-light)';
+            card.style.cursor = 'pointer';
+            card.innerHTML =
+                '<div style="font-weight:700;">' + a.unit_code + (idx === 0 ? ' (Closest)' : '') + '</div>' +
+                '<div class="help-text">Driver: ' + (a.driver_name || '-') + ' | Phone: ' + (a.contact_phone || '-') + '</div>' +
+                '<div class="help-text">Base: ' + (a.hospital_name || '-') + ' | ' + (a.district || '-') + ', ' + (a.state || '-') + '</div>' +
+                '<div class="help-text">Status: ' + (a.status || 'Available') + '</div>' +
+                '<div class="help-text">Distance: ' + (a.distance_km == null ? 'N/A' : (a.distance_km + ' km')) +
+                (eta ? (' | ETA ~ ' + eta + ' mins') : '') + '</div>';
+            card.addEventListener('click', function () {
+                setPreferredAmbulance(a.id, card);
+            });
+            listEl.appendChild(card);
+
+            if (a.latitude && a.longitude) {
+                const marker = L.marker([a.latitude, a.longitude]).addTo(map);
+                marker.bindPopup('<strong>' + a.unit_code + '</strong><br>' + (a.driver_name || 'Driver'));
+                ambulanceMarkers.push(marker);
+            }
+        });
+
+        const firstCard = listEl.querySelector('.amb-card');
+        if (firstCard) setPreferredAmbulance(items[0].id, firstCard);
+    }
+
+    function fetchNearbyAmbulances() {
+        const lat = (latField.value || '').trim();
+        const lng = (lngField.value || '').trim();
+        const state = encodeURIComponent((stateField.value || '').trim());
+        const district = encodeURIComponent((districtField.value || '').trim());
+        let url = '/api/ambulances/nearby?state=' + state + '&district=' + district;
+        if (lat && lng) url += '&lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng);
+
+        metaEl.textContent = 'Fetching nearest ambulance units...';
+        fetch(url)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                const items = data && data.ambulances ? data.ambulances : [];
+                metaEl.textContent = items.length
+                    ? ('Showing top ' + items.length + ' available units. Tap a card to book preferred unit.')
+                    : 'No available units found. Try updating state/district.';
+                renderAmbulances(items);
+            })
+            .catch(function () {
+                metaEl.textContent = 'Unable to fetch ambulance list.';
+                listEl.innerHTML = '<p class="help-text">Network error while loading ambulances.</p>';
+            });
+    }
+
+    function detectLocation() {
+        if (!navigator.geolocation) {
+            statusEl.textContent = 'Geolocation is not supported by your browser.';
+            statusEl.style.color = 'var(--danger)';
+            return;
+        }
+        statusEl.textContent = 'Capturing high-accuracy live location...';
+        statusEl.style.color = 'var(--text-light)';
+        bestFix = null;
+        let samples = 0;
+        const startedAt = Date.now();
+        const maxSamples = 4;
+        const maxWaitMs = 12000;
+        const idealAccuracy = 30;
+        let watchId = null;
+
+        function finalizeFix() {
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+            if (!bestFix) {
+                statusEl.textContent = 'Could not capture accurate location. Try again or set pin manually on map.';
+                statusEl.style.color = 'var(--danger)';
+                return;
+            }
+            updateUserLocation(bestFix.lat, bestFix.lng, bestFix.acc, 'gps');
+            if (bestFix.acc > 250) {
+                statusEl.textContent = 'Location captured but accuracy is low (' + Math.round(bestFix.acc) + 'm). Set pin manually for best result.';
+                statusEl.style.color = 'var(--warning)';
+            }
+            fetchNearbyAmbulances();
+        }
+
+        watchId = navigator.geolocation.watchPosition(function (position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const acc = position.coords.accuracy || 9999;
+            samples += 1;
+
+            if (!bestFix || acc < bestFix.acc) {
+                bestFix = { lat: lat, lng: lng, acc: acc };
+            }
+            statusEl.textContent = 'GPS sample ' + samples + ' captured (accuracy ' + Math.round(acc) + 'm)...';
+
+            const elapsed = Date.now() - startedAt;
+            if (acc <= idealAccuracy || samples >= maxSamples || elapsed >= maxWaitMs) {
+                finalizeFix();
+            }
+        }, function () {
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+            statusEl.textContent = 'Location permission denied or unavailable. Tap map to set location manually.';
+            statusEl.style.color = 'var(--danger)';
+        }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+    }
+
+    btnLive.addEventListener('click', detectLocation);
+    stateField.addEventListener('change', fetchNearbyAmbulances);
+    districtField.addEventListener('input', function () {
+        if ((districtField.value || '').trim().length > 2) fetchNearbyAmbulances();
+    });
+
+    map.on('click', function (e) {
+        updateUserLocation(e.latlng.lat, e.latlng.lng, null, 'manual');
+        fetchNearbyAmbulances();
+    });
+
+    document.querySelectorAll('[data-etype]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            emergencyType.value = btn.getAttribute('data-etype');
+        });
+    });
+
+    fetchNearbyAmbulances();
+});
+</script>
 {% endblock %}

@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block title %}Ambulance Dashboard{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Ambulance Live Tracking Panel</h1>
+        <p class="help-text">Keep this page open on driver phone to share live location.</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="{{ url_for('ambulance_logout') }}" class="btn small">Logout</a>
+    </div>
+</div>
+
+<section class="grid" style="grid-template-columns:1fr 1fr; gap:1rem;">
+    <div class="card">
+        {% if ambulance %}
+        <h2 style="margin-top:0;">Vehicle Identity</h2>
+        <p><strong>Unit:</strong> {{ ambulance['unit_code'] }}</p>
+        <p><strong>Driver:</strong> {{ ambulance['driver_name'] or '-' }}</p>
+        <p><strong>Hospital:</strong> {{ ambulance['hospital_name'] or '-' }}</p>
+        <p><strong>Phone:</strong> {{ ambulance['contact_phone'] }}</p>
+        <p><strong>Status:</strong> <span id="driver-status-text">{{ ambulance['status'] or 'Available' }}</span></p>
+
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-top:0.8rem;">
+            <button type="button" class="btn small primary" id="start-sharing">Start Live Sharing</button>
+            <button type="button" class="btn small" id="mark-available">Mark Available</button>
+            <button type="button" class="btn small" id="mark-offline">Mark Offline</button>
+        </div>
+        <p id="share-status" class="help-text" style="margin-top:0.75rem;">Location sharing is off.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Current Assignment</h2>
+        {% if current_emergency %}
+            <p><strong>Emergency ID:</strong> {{ current_emergency['id'] }}</p>
+            <p><strong>Patient:</strong> {{ current_emergency['name'] or '-' }}</p>
+            <p><strong>Phone:</strong> {{ current_emergency['phone'] or '-' }}</p>
+            <p><strong>Priority:</strong> {{ current_emergency['priority'] or '-' }}</p>
+            <p><strong>Location:</strong> {{ current_emergency['location'] or '-' }}</p>
+            {% if current_emergency['patient_latitude'] and current_emergency['patient_longitude'] %}
+            <p><a target="_blank" href="https://maps.google.com/?q={{ current_emergency['patient_latitude'] }},{{ current_emergency['patient_longitude'] }}">Open patient location on map</a></p>
+            {% endif %}
+        {% else %}
+            <p class="help-text">No active dispatch assigned right now.</p>
+        {% endif %}
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const startBtn = document.getElementById('start-sharing');
+    const availBtn = document.getElementById('mark-available');
+    const offBtn = document.getElementById('mark-offline');
+    const status = document.getElementById('share-status');
+    const driverStatus = document.getElementById('driver-status-text');
+    let sharingTimer = null;
+
+    function sendLocation(statusValue) {
+        if (!navigator.geolocation) {
+            status.textContent = 'Geolocation not supported on this device.';
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(function (pos) {
+            const fd = new FormData();
+            fd.append('latitude', pos.coords.latitude);
+            fd.append('longitude', pos.coords.longitude);
+            fd.append('status', statusValue);
+            fetch('{{ url_for("ambulance_location_update") }}', {
+                method: 'POST',
+                body: fd
+            }).then(function (res) {
+                if (!res.ok) throw new Error('Network');
+                driverStatus.textContent = statusValue;
+                status.textContent = 'Location updated at ' + new Date().toLocaleTimeString();
+            }).catch(function () {
+                status.textContent = 'Unable to send location update.';
+            });
+        }, function () {
+            status.textContent = 'Location permission denied or unavailable.';
+        }, { enableHighAccuracy: true, timeout: 10000 });
+    }
+
+    startBtn && startBtn.addEventListener('click', function () {
+        if (sharingTimer) clearInterval(sharingTimer);
+        sendLocation('Online');
+        sharingTimer = setInterval(function () { sendLocation('Online'); }, 12000);
+        status.textContent = 'Live sharing started. Updating every 12s.';
+    });
+
+    availBtn && availBtn.addEventListener('click', function () {
+        if (sharingTimer) clearInterval(sharingTimer);
+        sendLocation('Available');
+    });
+
+    offBtn && offBtn.addEventListener('click', function () {
+        if (sharingTimer) clearInterval(sharingTimer);
+        sendLocation('Offline');
+    });
+});
+</script>
+{% endblock %}

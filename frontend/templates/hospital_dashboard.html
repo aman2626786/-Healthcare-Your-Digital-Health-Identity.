@@ -14,6 +14,7 @@
     </div>
     <div class="ha-hero-actions">
         <a href="{{ url_for('hospital_emergencies', show='unseen') }}" class="btn small primary">🚑 Emergencies</a>
+        <a href="{{ url_for('hospital_ambulances') }}" class="btn small">Ambulances</a>
         <a href="{{ url_for('hospital_emergencies_export_csv') }}" class="btn small">Export Emergencies</a>
         <a href="{{ url_for('hospital_inventory') }}" class="btn small">📦 Inventory</a>
         <a href="{{ url_for('hospital_staff') }}" class="btn small">🧑‍💼 Staff</a>
@@ -21,6 +22,32 @@
         <a href="{{ url_for('hospital_profile') }}" class="btn small">👤 Profile</a>
         <a href="{{ url_for('hospital_logout') }}" class="btn small">Logout</a>
     </div>
+</section>
+
+<section class="card mt-lg">
+    <div class="section-header">
+        <h2>Hospital Verification QR</h2>
+        {% if hospital and hospital['abha_connected'] %}
+            <span class="badge" style="background:#ecfdf5; color:#065f46;">Verified</span>
+        {% else %}
+            <span class="badge" style="background:#fff7ed; color:#9a3412;">Pending Verification</span>
+        {% endif %}
+    </div>
+    <p class="help-text" style="margin-bottom:1rem;">
+        Patients can scan this QR to verify if your hospital is trusted and ABHA-connected before treatment.
+    </p>
+    {% if hospital_qr_rel_path %}
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:1.5rem;">
+            <img src="{{ url_for('static', filename=hospital_qr_rel_path) }}" alt="Hospital verification QR" style="width:180px; height:180px; border:1px solid var(--border); border-radius:10px; background:#fff; padding:0.4rem;">
+            <div>
+                <p style="margin:0 0 0.5rem 0;"><strong>Hospital Reg No:</strong> <span style="font-family:monospace;">{{ hospital['reg_no'] }}</span></p>
+                <p style="margin:0 0 0.8rem 0; word-break:break-all;" class="help-text">{{ hospital_verify_url }}</p>
+                <a href="{{ hospital_verify_url }}" target="_blank" class="btn small primary">Open Public Verification Page</a>
+            </div>
+        </div>
+    {% else %}
+        <p class="help-text">Unable to generate verification QR right now.</p>
+    {% endif %}
 </section>
 
 <section class="grid stats-grid">
@@ -159,7 +186,7 @@
             label: 'Count',
             data: priority.values,
             borderRadius: 10,
-            backgroundColor: 'rgba(37, 99, 235, 0.75)'
+            backgroundColor: 'rgba(15, 118, 110, 0.75)'
           }]
         },
         options: {
@@ -436,3 +463,5 @@
     </div>
 </section>
 {% endblock %}
+
+

@@ -47,6 +47,7 @@
                     <th>Location</th>
                     <th>Priority</th>
                     <th>Status</th>
+                    <th>Ambulance</th>
                     <th>Seen</th>
                     <th>Response Time (mins)</th>
                     <th>Actions</th>
@@ -69,6 +70,13 @@
                         {% if e['priority'] %}<span class="badge">{{ e['priority'] }}</span>{% else %}<span class="help-text">-</span>{% endif %}
                     </td>
                     <td>{{ e['status'] or '-' }}</td>
+                    <td>
+                        {% if e['ambulance_unit_code'] %}
+                            <span class="badge">{{ e['ambulance_unit_code'] }}</span>
+                        {% else %}
+                            <span class="help-text">Not assigned</span>
+                        {% endif %}
+                    </td>
                     <td>{% if e['seen_by_hospital'] %}Yes{% else %}<span class="badge">New</span>{% endif %}</td>
                     <td>{{ e['response_time_minutes'] if e['response_time_minutes'] is not none else '-' }}</td>
                     <td>
@@ -85,6 +93,17 @@
                                 <input type="text" name="status" placeholder="Update status" value="{{ e['status'] or '' }}" style="margin-bottom:0.35rem;">
                                 <input type="number" name="response_time_minutes" placeholder="Response mins" value="{{ e['response_time_minutes'] if e['response_time_minutes'] is not none else '' }}" style="margin-bottom:0.35rem;">
                                 <button type="submit" class="btn small primary">Save</button>
+                            </form>
+
+                            <form method="post" action="{{ url_for('hospital_emergency_assign_ambulance') }}">
+                                <input type="hidden" name="emergency_id" value="{{ e['id'] }}">
+                                <select name="ambulance_id" required style="margin-bottom:0.35rem;">
+                                    <option value="">Assign ambulance</option>
+                                    {% for a in ambulances %}
+                                        <option value="{{ a['id'] }}">{{ a['unit_code'] }} ({{ a['status'] }})</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="btn small">Assign</button>
                             </form>
                         </div>
                     </td>

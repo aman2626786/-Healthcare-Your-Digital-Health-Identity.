@@ -4,7 +4,7 @@
 <div class="page-header">
     <div>
         <h1>📷 Scan Emergency QR</h1>
-        <p class="help-text">Scan a Swasthya Sampark Health ID QR code to access critical patient information during an emergency.</p>
+        <p class="help-text">Scan a Healthcare Health ID QR code to access critical patient information during an emergency.</p>
     </div>
     <div class="page-header-actions">
         <a href="{{ url_for('user_dashboard') }}" class="btn small">← Back to Dashboard</a>
@@ -34,19 +34,29 @@ document.addEventListener("DOMContentLoaded", function() {
         aspectRatio: 1.0
     };
 
+    function resolveScanTarget(rawText) {
+        const text = (rawText || "").trim();
+        if (!text) return null;
+        if (/^https?:\/\//i.test(text)) return text;
+        if (text.includes('/scan/') || text.includes('/hospital/verify/')) return text;
+        return "/scan/" + encodeURIComponent(text);
+    }
+
     function onScanSuccess(decodedText, decodedResult) {
         console.log(`Scan result ${decodedText}`, decodedResult);
-        statusEl.innerHTML = "✅ Scanning successful! Redirecting...";
+        statusEl.innerHTML = "Scan successful. Redirecting...";
         statusEl.style.color = "var(--success)";
         statusEl.style.fontWeight = "bold";
         readerEl.style.border = "2px solid var(--success)";
         readerEl.style.boxShadow = "0 0 20px rgba(34, 197, 94, 0.4)";
-        
+
         html5QrCode.stop().then(() => {
-            if(decodedText.includes('/scan/')) {
-                window.location.href = decodedText;
+            const target = resolveScanTarget(decodedText);
+            if (target) {
+                window.location.href = target;
             } else {
-                window.location.href = "/scan/" + decodedText;
+                statusEl.innerHTML = "Invalid QR data.";
+                statusEl.style.color = "var(--danger)";
             }
         }).catch(err => console.log(err));
     }
@@ -65,7 +75,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 switchBtn.style.marginTop = "15px";
                 switchBtn.style.padding = "0.75rem 1.5rem";
                 switchBtn.style.borderRadius = "8px";
-                switchBtn.style.background = "linear-gradient(135deg, var(--primary), #3b82f6)";
+                switchBtn.style.background = "linear-gradient(135deg, var(--primary), #14b8a6)";
                 switchBtn.style.border = "none";
                 switchBtn.style.color = "white";
                 switchBtn.style.cursor = "pointer";
@@ -136,7 +146,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 /* Adjust html5-qrcode standard styling to match our sleek glassmorphism theme */
 #reader button {
-    background: linear-gradient(135deg, var(--primary), #3b82f6);
+    background: linear-gradient(135deg, var(--primary), #14b8a6);
     color: white;
     border: none;
     padding: 0.6rem 1.2rem;
@@ -190,3 +200,6 @@ document.addEventListener("DOMContentLoaded", function() {
 }
 </style>
 {% endblock %}
+
+
+

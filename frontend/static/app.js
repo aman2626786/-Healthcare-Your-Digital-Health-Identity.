@@ -408,15 +408,16 @@ function setupThemeToggle() {
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         if (isDark) {
             document.documentElement.removeAttribute('data-theme');
-            localStorage.setItem('swasthya_theme', 'light');
+            localStorage.setItem('healthcare_theme', 'light');
             iconSun.style.display = 'block';
             iconMoon.style.display = 'none';
         } else {
             document.documentElement.setAttribute('data-theme', 'dark');
-            localStorage.setItem('swasthya_theme', 'dark');
+            localStorage.setItem('healthcare_theme', 'dark');
             iconSun.style.display = 'none';
             iconMoon.style.display = 'block';
         }
     });
 }
 setupThemeToggle();
+

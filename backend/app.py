@@ -19,6 +19,7 @@ import requests
 import random
 import warnings
 import re
+import math
 
 
 def demo_defaults():
@@ -92,6 +93,8 @@ else:
     MODEL_PATH = os.path.join(BACKEND_DIR, 'pkl', 'svm_health_risk_model.pkl')
     EMERGENCY_MODEL_PATH = os.path.join(BACKEND_DIR, 'pkl', 'Logistic_regression_prediction.pkl')
     app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+N8N_AMBULANCE_WEBHOOK_URL = os.environ.get('N8N_AMBULANCE_WEBHOOK_URL', '').strip()
 
 # Firebase Configuration
 FIREBASE_INITIALIZED = False
@@ -374,6 +377,27 @@ def init_db():
         )
         print("[OK] Created/verified emergencies table")
 
+        # Ambulance units (hospital-owned or network-owned)
+        cur.execute(
+            '''CREATE TABLE IF NOT EXISTS ambulance_units (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   hospital_id INTEGER,
+                   unit_code TEXT UNIQUE NOT NULL,
+                   driver_name TEXT,
+                   contact_phone TEXT NOT NULL,
+                   login_pin TEXT,
+                   latitude REAL,
+                   longitude REAL,
+                   state TEXT,
+                   district TEXT,
+                   status TEXT NOT NULL DEFAULT 'Available',
+                   last_seen_at TEXT NOT NULL,
+                   created_at TEXT NOT NULL,
+                   FOREIGN KEY(hospital_id) REFERENCES hospitals(id)
+               )'''
+        )
+        print("[OK] Created/verified ambulance_units table")
+
         # OTP storage for password reset and login
         cur.execute(
             '''CREATE TABLE IF NOT EXISTS otp_codes (
@@ -649,6 +673,35 @@ def init_db():
             conn.commit()
         except sqlite3.OperationalError:
             pass  # Column already exists
+
+        emergency_ambulance_cols = [
+            ('patient_latitude', 'REAL'),
+            ('patient_longitude', 'REAL'),
+            ('ambulance_id', 'INTEGER'),
+            ('ambulance_assigned_at', 'TEXT'),
+            ('ambulance_notification_status', 'TEXT'),
+            ('ambulance_notification_message', 'TEXT'),
+        ]
+        for col_name, col_type in emergency_ambulance_cols:
+            try:
+                cur.execute(f'ALTER TABLE emergencies ADD COLUMN {col_name} {col_type}')
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
+        ambulance_unit_cols = [
+            ('hospital_id', 'INTEGER'),
+            ('driver_name', 'TEXT'),
+            ('state', 'TEXT'),
+            ('district', 'TEXT'),
+            ('login_pin', 'TEXT'),
+        ]
+        for col_name, col_type in ambulance_unit_cols:
+            try:
+                cur.execute(f'ALTER TABLE ambulance_units ADD COLUMN {col_name} {col_type}')
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass  # Column already exists
         
         try:
             cur.execute('ALTER TABLE hospitals ADD COLUMN district TEXT')
@@ -1882,6 +1935,18 @@ def generate_health_qr(health_id):
     return f"qr/{health_id}.png"
 
 
+def generate_hospital_qr(reg_no):
+    if not QRCODE_AVAILABLE or not reg_no:
+        return None
+    safe_reg_no = re.sub(r'[^A-Za-z0-9_-]', '_', str(reg_no).strip())
+    qr_filename = f"hospital_{safe_reg_no}.png"
+    qr_path = os.path.join(QR_FOLDER, qr_filename)
+    verify_url = url_for('hospital_verify', reg_no=reg_no, _external=True)
+    img = qrcode.make(verify_url)
+    img.save(qr_path)
+    return f"qr/{qr_filename}"
+
+
 @app.route('/scan/<health_id>')
 def scan_qr(health_id):
     conn = get_db_connection()
@@ -1900,6 +1965,27 @@ def scan_qr(health_id):
     
     # Public view
     return render_template('public_emergency_card.html', patient=patient)
+
+
+@app.route('/hospital/verify/<reg_no>')
+def hospital_verify(reg_no):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM hospitals WHERE UPPER(reg_no) = UPPER(?)', (reg_no.strip(),))
+    hospital = cur.fetchone()
+    conn.close()
+
+    if not hospital:
+        flash('Hospital verification failed. Invalid registration number.', 'danger')
+        return redirect(url_for('index'))
+
+    is_verified = bool(hospital['abha_connected']) if 'abha_connected' in hospital.keys() else False
+    return render_template(
+        'hospital_verification.html',
+        hospital=hospital,
+        is_verified=is_verified,
+        verified_on=datetime.now().strftime('%d %b %Y, %I:%M %p'),
+    )
 
 @app.route('/doctor/scan_result/<health_id>')
 def doctor_scan_result(health_id):
@@ -1980,6 +2066,71 @@ def api_hospitals_nearby():
     # Sort by distance and return top 15
     nearby.sort(key=lambda x: x['distance'])
     return {'hospitals': nearby[:15]}
+
+
+@app.route('/api/ambulances/nearby')
+def api_ambulances_nearby():
+    """Return nearest available ambulances for live emergency page preview."""
+    lat_raw = (request.args.get('lat') or '').strip()
+    lng_raw = (request.args.get('lng') or '').strip()
+    state = (request.args.get('state') or '').strip().lower()
+    district = (request.args.get('district') or '').strip().lower()
+
+    patient_lat = None
+    patient_lng = None
+    try:
+        if lat_raw and lng_raw:
+            patient_lat = float(lat_raw)
+            patient_lng = float(lng_raw)
+    except ValueError:
+        patient_lat = None
+        patient_lng = None
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        '''SELECT a.id, a.unit_code, a.driver_name, a.contact_phone, a.latitude, a.longitude, a.state, a.district, a.status,
+                  h.name AS hospital_name
+           FROM ambulance_units a
+           LEFT JOIN hospitals h ON a.hospital_id = h.id
+           WHERE COALESCE(a.status, 'Available') IN ('Available', 'Online', 'On Duty') '''
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    items = []
+    for r in rows:
+        row_state = (r['state'] or '').strip().lower()
+        row_district = (r['district'] or '').strip().lower()
+        state_match = bool(state and row_state == state)
+        district_match = bool(district and row_district == district)
+        has_geo = r['latitude'] is not None and r['longitude'] is not None
+        distance = None
+        if patient_lat is not None and patient_lng is not None and has_geo:
+            distance = round(_haversine_km(patient_lat, patient_lng, r['latitude'], r['longitude']), 2)
+        items.append({
+            'id': r['id'],
+            'unit_code': r['unit_code'],
+            'driver_name': r['driver_name'],
+            'contact_phone': r['contact_phone'],
+            'hospital_name': r['hospital_name'],
+            'state': r['state'],
+            'district': r['district'],
+            'status': r['status'],
+            'latitude': r['latitude'],
+            'longitude': r['longitude'],
+            'distance_km': distance,
+            'district_match': district_match,
+            'state_match': state_match,
+        })
+
+    def sort_key(x):
+        # Prefer district/state matches first, then nearest distance where available.
+        dist = x['distance_km'] if x['distance_km'] is not None else 999999
+        return (-int(x['district_match']), -int(x['state_match']), dist, x['id'])
+
+    items.sort(key=sort_key)
+    return {'ambulances': items[:10], 'count': len(items)}
 
 
 # Health Risk Prediction Function
@@ -3077,6 +3228,156 @@ def _ensure_staff_hospital():
     return hospital_id, staff_row
 
 
+def _haversine_km(lat1, lon1, lat2, lon2):
+    """Compute distance in KM between two geo points."""
+    lat1, lon1, lat2, lon2 = map(float, [lat1, lon1, lat2, lon2])
+    r = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return r * c
+
+
+def _select_nearest_available_ambulance(patient_lat=None, patient_lng=None, state=None, district=None):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        '''SELECT a.*, h.name AS hospital_name
+           FROM ambulance_units a
+           LEFT JOIN hospitals h ON a.hospital_id = h.id
+           WHERE COALESCE(a.status, 'Available') IN ('Available', 'Online', 'On Duty') '''
+    )
+    rows = cur.fetchall()
+    conn.close()
+    if not rows:
+        return None
+
+    district_norm = (district or '').strip().lower()
+    state_norm = (state or '').strip().lower()
+    has_patient_geo = patient_lat is not None and patient_lng is not None
+
+    ranked = []
+    for r in rows:
+        row_district = (r['district'] or '').strip().lower()
+        row_state = (r['state'] or '').strip().lower()
+        district_match = 1 if district_norm and row_district == district_norm else 0
+        state_match = 1 if state_norm and row_state == state_norm else 0
+        distance = 999999.0
+        has_geo = r['latitude'] is not None and r['longitude'] is not None
+        if has_patient_geo and has_geo:
+            distance = _haversine_km(patient_lat, patient_lng, r['latitude'], r['longitude'])
+        ranked.append((district_match, state_match, has_geo, distance, r))
+
+    # Higher district/state match first, then rows with geo, then nearest distance.
+    ranked.sort(key=lambda x: (-x[0], -x[1], -int(bool(x[2])), x[3], x[4]['id']))
+    return ranked[0][4] if ranked else None
+
+
+def _notify_ambulance_dispatch(ambulance_row, emergency_payload):
+    msg = (
+        f"EMERGENCY DISPATCH | Unit: {ambulance_row['unit_code']} | "
+        f"Patient: {emergency_payload.get('name') or 'Unknown'} | "
+        f"Phone: {emergency_payload.get('phone') or '-'} | "
+        f"Location: {emergency_payload.get('location') or '-'} | "
+        f"Priority: {emergency_payload.get('priority') or 'Medium'} | "
+        f"Maps: {emergency_payload.get('maps_url') or '-'}"
+    )
+    if not N8N_AMBULANCE_WEBHOOK_URL:
+        return 'PENDING', 'No webhook configured. Dispatch logged only.'
+
+    payload = {
+        'channel': 'ambulance_dispatch',
+        'ambulance': {
+            'id': ambulance_row['id'],
+            'unit_code': ambulance_row['unit_code'],
+            'driver_name': ambulance_row['driver_name'],
+            'contact_phone': ambulance_row['contact_phone'],
+            'hospital_id': ambulance_row['hospital_id'],
+            'hospital_name': ambulance_row['hospital_name'] if 'hospital_name' in ambulance_row.keys() else None,
+        },
+        'emergency': emergency_payload,
+        'message': msg,
+        'created_at': datetime.utcnow().isoformat(),
+    }
+    try:
+        resp = requests.post(N8N_AMBULANCE_WEBHOOK_URL, json=payload, timeout=8)
+        if 200 <= resp.status_code < 300:
+            return 'SENT', 'Notification sent to ambulance workflow.'
+        return 'FAILED', f'Webhook responded with status {resp.status_code}'
+    except Exception as e:
+        return 'FAILED', f'Webhook error: {str(e)}'
+
+
+def _assign_ambulance_to_emergency(
+    emergency_id,
+    name,
+    phone,
+    location,
+    priority,
+    patient_lat=None,
+    patient_lng=None,
+    state=None,
+    district=None,
+    preferred_ambulance_id=None,
+):
+    ambulance = None
+    if preferred_ambulance_id:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            '''SELECT a.*, h.name AS hospital_name
+               FROM ambulance_units a
+               LEFT JOIN hospitals h ON a.hospital_id = h.id
+               WHERE a.id = ? AND COALESCE(a.status, 'Available') IN ('Available', 'Online', 'On Duty')''',
+            (preferred_ambulance_id,),
+        )
+        ambulance = cur.fetchone()
+        conn.close()
+    if not ambulance:
+        ambulance = _select_nearest_available_ambulance(patient_lat=patient_lat, patient_lng=patient_lng, state=state, district=district)
+    if not ambulance:
+        return None, 'UNAVAILABLE', 'No available ambulance unit found.'
+
+    maps_url = ''
+    if patient_lat is not None and patient_lng is not None:
+        maps_url = f"https://maps.google.com/?q={patient_lat},{patient_lng}"
+
+    emergency_payload = {
+        'id': emergency_id,
+        'name': name,
+        'phone': phone,
+        'location': location,
+        'priority': priority,
+        'patient_latitude': patient_lat,
+        'patient_longitude': patient_lng,
+        'state': state,
+        'district': district,
+        'maps_url': maps_url,
+    }
+    notify_status, notify_msg = _notify_ambulance_dispatch(ambulance, emergency_payload)
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    now_iso = datetime.utcnow().isoformat()
+    cur.execute(
+        '''UPDATE emergencies
+           SET ambulance_id = ?, ambulance_assigned_at = ?, ambulance_notification_status = ?, ambulance_notification_message = ?
+           WHERE id = ?''',
+        (ambulance['id'], now_iso, notify_status, notify_msg, emergency_id),
+    )
+    cur.execute(
+        '''UPDATE ambulance_units
+           SET status = 'Dispatched', last_seen_at = ?
+           WHERE id = ?''',
+        (now_iso, ambulance['id']),
+    )
+    conn.commit()
+    conn.close()
+
+    return ambulance, notify_status, notify_msg
+
+
 def _select_hospital_for_emergency(state=None, district=None):
     """Pick the nearest available hospital based on coarse location data.
 
@@ -3191,14 +3492,14 @@ def hospital_dashboard():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Load basic hospital info (for location display)
-    # Be defensive in case the existing DB was created before state/district columns were added.
-    try:
-        cur.execute('SELECT state, district FROM hospitals WHERE id = ?', (hospital_id,))
-        hospital = cur.fetchone()
-    except sqlite3.OperationalError:
-        # Fallback: no such columns in this DB; keep hospital minimal so template can still render.
-        hospital = {'state': None, 'district': None}
+    # Load hospital info for dashboard and verification QR
+    cur.execute('SELECT * FROM hospitals WHERE id = ?', (hospital_id,))
+    hospital = cur.fetchone()
+    hospital_qr_rel_path = None
+    hospital_verify_url = None
+    if hospital and hospital['reg_no']:
+        hospital_qr_rel_path = generate_hospital_qr(hospital['reg_no'])
+        hospital_verify_url = url_for('hospital_verify', reg_no=hospital['reg_no'], _external=True)
 
     # Count doctors for this hospital
     cur.execute('SELECT COUNT(*) AS c FROM doctors WHERE hospital_id = ?', (hospital_id,))
@@ -3406,10 +3707,199 @@ def hospital_dashboard():
         emergency_priority_counts=emergency_priority_counts,
         emergency_avg_response_minutes=emergency_avg_response_minutes,
         recent_staff_logs=recent_staff_logs,
+        hospital_qr_rel_path=hospital_qr_rel_path,
+        hospital_verify_url=hospital_verify_url,
         doctors=doctors,
         patients=patients,
         records=records,
     )
+
+
+@app.route('/hospital/ambulances', methods=['GET', 'POST'])
+def hospital_ambulances():
+    if current_role() != 'hospital':
+        flash('Unauthorized', 'danger')
+        return redirect(url_for('index'))
+
+    hospital_id = current_user_id()
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if request.method == 'POST':
+        unit_code = (request.form.get('unit_code') or '').strip().upper()
+        driver_name = (request.form.get('driver_name') or '').strip() or None
+        contact_phone = (request.form.get('contact_phone') or '').strip()
+        login_pin = (request.form.get('login_pin') or '').strip()
+        latitude_raw = (request.form.get('latitude') or '').strip()
+        longitude_raw = (request.form.get('longitude') or '').strip()
+        state = (request.form.get('state') or '').strip() or None
+        district = (request.form.get('district') or '').strip() or None
+        if not unit_code or not contact_phone:
+            conn.close()
+            flash('Unit code and contact phone are required.', 'danger')
+            return redirect(url_for('hospital_ambulances'))
+
+        latitude = float(latitude_raw) if latitude_raw else None
+        longitude = float(longitude_raw) if longitude_raw else None
+        if not login_pin:
+            login_pin = str(random.randint(1000, 9999))
+        try:
+            cur.execute(
+                '''INSERT INTO ambulance_units
+                   (hospital_id, unit_code, driver_name, contact_phone, login_pin, latitude, longitude, state, district, status, last_seen_at, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', ?, ?)''',
+                (hospital_id, unit_code, driver_name, contact_phone, login_pin, latitude, longitude, state, district, datetime.utcnow().isoformat(), datetime.utcnow().isoformat()),
+            )
+            conn.commit()
+            flash(f'Ambulance unit added. Driver login PIN: {login_pin}', 'success')
+        except sqlite3.IntegrityError:
+            flash('Unit code already exists.', 'danger')
+        conn.close()
+        return redirect(url_for('hospital_ambulances'))
+
+    cur.execute(
+        '''SELECT *
+           FROM ambulance_units
+           WHERE hospital_id = ?
+           ORDER BY created_at DESC, id DESC''',
+        (hospital_id,),
+    )
+    ambulances = cur.fetchall()
+    conn.close()
+    return render_template('hospital_ambulances.html', ambulances=ambulances)
+
+
+@app.route('/hospital/ambulances/update_status', methods=['POST'])
+def hospital_ambulance_update_status():
+    if current_role() != 'hospital':
+        flash('Unauthorized', 'danger')
+        return redirect(url_for('index'))
+
+    hospital_id = current_user_id()
+    ambulance_id = int((request.form.get('ambulance_id') or '0').strip() or 0)
+    status = (request.form.get('status') or '').strip()
+    allowed = {'Available', 'Dispatched', 'On Duty', 'Offline'}
+    if not ambulance_id or status not in allowed:
+        flash('Invalid ambulance update request.', 'danger')
+        return redirect(url_for('hospital_ambulances'))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        '''UPDATE ambulance_units
+           SET status = ?, last_seen_at = ?
+           WHERE id = ? AND hospital_id = ?''',
+        (status, datetime.utcnow().isoformat(), ambulance_id, hospital_id),
+    )
+    conn.commit()
+    conn.close()
+    flash('Ambulance status updated.', 'success')
+    return redirect(url_for('hospital_ambulances'))
+
+
+@app.route('/ambulance/login', methods=['GET', 'POST'])
+def ambulance_login():
+    if request.method == 'POST':
+        unit_code = (request.form.get('unit_code') or '').strip().upper()
+        contact_phone = (request.form.get('contact_phone') or '').strip()
+        login_pin = (request.form.get('login_pin') or '').strip()
+        if not unit_code or not contact_phone or not login_pin:
+            flash('Unit code, phone, and PIN are required.', 'danger')
+            return render_template('ambulance_login.html', unit_code=unit_code, contact_phone=contact_phone)
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            '''SELECT * FROM ambulance_units
+               WHERE UPPER(unit_code) = UPPER(?) AND contact_phone = ?
+                 AND (login_pin = ? OR (login_pin IS NULL AND SUBSTR(contact_phone, -4) = ?))''',
+            (unit_code, contact_phone, login_pin, login_pin),
+        )
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            flash('Invalid ambulance credentials.', 'danger')
+            return render_template('ambulance_login.html', unit_code=unit_code, contact_phone=contact_phone)
+
+        login_user('ambulance', row['id'])
+        flash('Ambulance driver login successful.', 'success')
+        return redirect(url_for('ambulance_dashboard'))
+
+    return render_template('ambulance_login.html')
+
+
+@app.route('/ambulance/logout')
+def ambulance_logout():
+    session.clear()
+    flash('Logged out.', 'info')
+    return redirect(url_for('index'))
+
+
+@app.route('/ambulance/dashboard')
+def ambulance_dashboard():
+    if current_role() != 'ambulance':
+        flash('Unauthorized', 'danger')
+        return redirect(url_for('index'))
+
+    ambulance_id = current_user_id()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        '''SELECT a.*, h.name AS hospital_name
+           FROM ambulance_units a
+           LEFT JOIN hospitals h ON a.hospital_id = h.id
+           WHERE a.id = ?''',
+        (ambulance_id,),
+    )
+    ambulance = cur.fetchone()
+    current_emergency = None
+    if ambulance:
+        cur.execute(
+            '''SELECT *
+               FROM emergencies
+               WHERE ambulance_id = ? AND COALESCE(status, '') LIKE '%Dispatched%'
+               ORDER BY requested_at DESC
+               LIMIT 1''',
+            (ambulance_id,),
+        )
+        current_emergency = cur.fetchone()
+    conn.close()
+    return render_template('ambulance_dashboard.html', ambulance=ambulance, current_emergency=current_emergency)
+
+
+@app.route('/ambulance/location/update', methods=['POST'])
+def ambulance_location_update():
+    if current_role() != 'ambulance':
+        return {'ok': False, 'error': 'unauthorized'}, 401
+
+    ambulance_id = current_user_id()
+    lat_raw = (request.form.get('latitude') or '').strip()
+    lng_raw = (request.form.get('longitude') or '').strip()
+    status = (request.form.get('status') or '').strip() or 'Online'
+    district = (request.form.get('district') or '').strip() or None
+    state = (request.form.get('state') or '').strip() or None
+
+    try:
+        lat = float(lat_raw)
+        lng = float(lng_raw)
+    except ValueError:
+        return {'ok': False, 'error': 'invalid coordinates'}, 400
+
+    allowed_status = {'Online', 'Available', 'On Duty', 'Dispatched', 'Offline'}
+    if status not in allowed_status:
+        status = 'Online'
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        '''UPDATE ambulance_units
+           SET latitude = ?, longitude = ?, status = ?, district = COALESCE(?, district), state = COALESCE(?, state), last_seen_at = ?
+           WHERE id = ?''',
+        (lat, lng, status, district, state, datetime.utcnow().isoformat(), ambulance_id),
+    )
+    conn.commit()
+    conn.close()
+    return {'ok': True}
 
 
 @app.route('/hospital/emergencies')
@@ -3436,14 +3926,17 @@ def hospital_emergencies():
     where_sql = ' WHERE ' + ' AND '.join(where)
 
     emergencies = []
+    ambulances = []
     try:
         cur.execute(
-            f'''SELECT id, name, phone, location, status, requested_at, priority, state, district,
+            f'''SELECT e.id, e.name, e.phone, e.location, e.status, e.requested_at, e.priority, e.state, e.district,
+                       e.ambulance_id, a.unit_code AS ambulance_unit_code,
                        COALESCE(seen_by_hospital, 0) AS seen_by_hospital,
-                       response_time_minutes
-                FROM emergencies
+                       e.response_time_minutes
+                FROM emergencies e
+                LEFT JOIN ambulance_units a ON e.ambulance_id = a.id
                 {where_sql}
-                ORDER BY requested_at DESC
+                ORDER BY e.requested_at DESC
                 LIMIT 300''',
             tuple(params),
         )
@@ -3451,8 +3944,20 @@ def hospital_emergencies():
     except sqlite3.OperationalError:
         emergencies = []
 
+    try:
+        cur.execute(
+            '''SELECT id, unit_code, status
+               FROM ambulance_units
+               WHERE hospital_id = ? AND COALESCE(status, 'Available') IN ('Available', 'Online', 'On Duty')
+               ORDER BY unit_code ASC''',
+            (hospital_id,),
+        )
+        ambulances = cur.fetchall()
+    except sqlite3.OperationalError:
+        ambulances = []
+
     conn.close()
-    return render_template('hospital_emergencies.html', emergencies=emergencies, status=status, show=show)
+    return render_template('hospital_emergencies.html', emergencies=emergencies, status=status, show=show, ambulances=ambulances)
 
 
 @app.route('/hospital/emergencies/mark_seen', methods=['POST'])
@@ -3469,7 +3974,7 @@ def hospital_emergencies_mark_seen():
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT id FROM emergencies WHERE id = ? AND hospital_id = ?', (emergency_id, hospital_id))
+    cur.execute('SELECT id, ambulance_id FROM emergencies WHERE id = ? AND hospital_id = ?', (emergency_id, hospital_id))
     row = cur.fetchone()
     if not row:
         conn.close()
@@ -3481,6 +3986,91 @@ def hospital_emergencies_mark_seen():
     conn.close()
     flash('Marked as seen.', 'success')
     return redirect(url_for('hospital_emergencies'))
+
+
+@app.route('/hospital/emergencies/assign_ambulance', methods=['POST'])
+def hospital_emergency_assign_ambulance():
+    if current_role() != 'hospital':
+        flash('Unauthorized', 'danger')
+        return redirect(url_for('index'))
+
+    hospital_id = current_user_id()
+    emergency_id = int((request.form.get('emergency_id') or '0').strip() or 0)
+    ambulance_id = int((request.form.get('ambulance_id') or '0').strip() or 0)
+    if not emergency_id or not ambulance_id:
+        flash('Invalid ambulance assignment request.', 'danger')
+        return redirect(url_for('hospital_emergencies'))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM emergencies WHERE id = ? AND hospital_id = ?', (emergency_id, hospital_id))
+    em = cur.fetchone()
+    if not em:
+        conn.close()
+        flash('Emergency not found.', 'warning')
+        return redirect(url_for('hospital_emergencies'))
+
+    cur.execute(
+        '''SELECT a.*, h.name AS hospital_name
+           FROM ambulance_units a
+           LEFT JOIN hospitals h ON a.hospital_id = h.id
+           WHERE a.id = ? AND a.hospital_id = ?''',
+        (ambulance_id, hospital_id),
+    )
+    amb = cur.fetchone()
+    if not amb:
+        conn.close()
+        flash('Ambulance not found for this hospital.', 'warning')
+        return redirect(url_for('hospital_emergencies'))
+
+    if (amb['status'] or 'Available') not in {'Available', 'Online', 'On Duty'}:
+        conn.close()
+        flash('Selected ambulance is not currently available.', 'warning')
+        return redirect(url_for('hospital_emergencies'))
+
+    # Release previous ambulance if reassigning
+    old_ambulance_id = em['ambulance_id'] if 'ambulance_id' in em.keys() else None
+    if old_ambulance_id and old_ambulance_id != ambulance_id:
+        cur.execute(
+            "UPDATE ambulance_units SET status = 'Available', last_seen_at = ? WHERE id = ?",
+            (datetime.utcnow().isoformat(), old_ambulance_id),
+        )
+
+    maps_url = ''
+    if 'patient_latitude' in em.keys() and 'patient_longitude' in em.keys() and em['patient_latitude'] and em['patient_longitude']:
+        maps_url = f"https://maps.google.com/?q={em['patient_latitude']},{em['patient_longitude']}"
+    notify_status, notify_message = _notify_ambulance_dispatch(
+        amb,
+        {
+            'id': em['id'],
+            'name': em['name'],
+            'phone': em['phone'],
+            'location': em['location'],
+            'priority': em['priority'],
+            'patient_latitude': em['patient_latitude'] if 'patient_latitude' in em.keys() else None,
+            'patient_longitude': em['patient_longitude'] if 'patient_longitude' in em.keys() else None,
+            'state': em['state'] if 'state' in em.keys() else None,
+            'district': em['district'] if 'district' in em.keys() else None,
+            'maps_url': maps_url,
+        },
+    )
+
+    cur.execute(
+        '''UPDATE emergencies
+           SET ambulance_id = ?, ambulance_assigned_at = ?, ambulance_notification_status = ?, ambulance_notification_message = ?
+           WHERE id = ? AND hospital_id = ?''',
+        (ambulance_id, datetime.utcnow().isoformat(), notify_status, notify_message, emergency_id, hospital_id),
+    )
+    cur.execute(
+        '''UPDATE ambulance_units
+           SET status = 'Dispatched', last_seen_at = ?
+           WHERE id = ?''',
+        (datetime.utcnow().isoformat(), ambulance_id),
+    )
+    conn.commit()
+    conn.close()
+    flash(f'Ambulance {amb["unit_code"]} assigned to emergency #{emergency_id}.', 'success')
+    return redirect(url_for('hospital_emergencies') + f"#e-{emergency_id}")
 
 
 @app.route('/hospital/emergencies/update', methods=['POST'])
@@ -3520,6 +4110,16 @@ def hospital_emergencies_update():
         cur.execute(
             'UPDATE emergencies SET response_time_minutes = COALESCE(?, response_time_minutes) WHERE id = ? AND hospital_id = ?',
             (response_time_minutes, emergency_id, hospital_id),
+        )
+
+    # If emergency is closed/resolved, release assigned ambulance back to Available.
+    status_norm = (status or '').strip().lower()
+    if row['ambulance_id'] and status_norm in {'resolved', 'completed', 'closed', 'done'}:
+        cur.execute(
+            '''UPDATE ambulance_units
+               SET status = 'Available', last_seen_at = ?
+               WHERE id = ?''',
+            (datetime.utcnow().isoformat(), row['ambulance_id']),
         )
     conn.commit()
     conn.close()
@@ -6165,6 +6765,12 @@ def emergency():
         time_slot = request.form.get('time_slot')
         emergency_type = request.form.get('emergency_type')
         weather = request.form.get('weather')
+        preferred_ambulance_raw = (request.form.get('preferred_ambulance_id') or '').strip()
+        preferred_ambulance_id = int(preferred_ambulance_raw) if preferred_ambulance_raw.isdigit() else None
+        patient_lat_raw = (request.form.get('patient_latitude') or '').strip()
+        patient_lng_raw = (request.form.get('patient_longitude') or '').strip()
+        patient_latitude = float(patient_lat_raw) if patient_lat_raw else None
+        patient_longitude = float(patient_lng_raw) if patient_lng_raw else None
         
         # Auto-detect day if not provided
         if not day:
@@ -6235,9 +6841,9 @@ def emergency():
         cur.execute(
             '''INSERT INTO emergencies (user_id, name, phone, location, status, requested_at, 
                response_time_minutes, priority, severity, prediction_score, symptoms, age,
-               state, district, zone, day, time_slot, emergency_type, weather,
+               state, district, zone, day, time_slot, emergency_type, weather, patient_latitude, patient_longitude,
                hospital_id, assigned_at, seen_by_hospital)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (
                 user_id,
                 name,
@@ -6258,6 +6864,8 @@ def emergency():
                 time_slot,
                 emergency_type,
                 weather,
+                patient_latitude,
+                patient_longitude,
                 assigned_hospital_id,
                 assigned_at,
                 0
@@ -6268,15 +6876,32 @@ def emergency():
         # Get emergency ID for result page
         emergency_id = cur.lastrowid
 
+        # Allocate nearest available ambulance and trigger message workflow
+        ambulance_row, ambulance_notify_status, ambulance_notify_message = _assign_ambulance_to_emergency(
+            emergency_id=emergency_id,
+            name=name,
+            phone=phone,
+            location=location,
+            priority=priority,
+            patient_lat=patient_latitude,
+            patient_lng=patient_longitude,
+            state=state,
+            district=district,
+            preferred_ambulance_id=preferred_ambulance_id,
+        )
+
         # Calculate active requests (pending emergencies, excluding current one)
-        cur.execute('SELECT COUNT(*) AS c FROM emergencies WHERE id != ? AND status LIKE ?', 
-                   (emergency_id, '%Dispatched%'))
+        cur.execute(
+            '''SELECT COUNT(*) AS c
+               FROM emergencies
+               WHERE id != ? AND COALESCE(status, '') LIKE ?''',
+            (emergency_id, '%Dispatched%'),
+        )
         active_requests = cur.fetchone()['c']
         
-        # Calculate available ambulances (simulated: total ambulances - active requests)
-        # In a real system, this would come from ambulance tracking system
-        total_ambulances = 10  # Simulated total ambulances
-        available_ambulances = max(0, total_ambulances - active_requests - 1)  # -1 for current dispatch
+        # Calculate available ambulances from real ambulance inventory
+        cur.execute("SELECT COUNT(*) AS c FROM ambulance_units WHERE COALESCE(status, 'Available') = 'Available'")
+        available_ambulances = cur.fetchone()['c'] or 0
         
         # Get prediction probabilities for all classes
         prediction_probabilities = {}
@@ -6477,6 +7102,9 @@ def emergency():
         return render_template('emergency_result.html', 
                              stats=stats, 
                              emergency=emergency_record,
+                             ambulance=ambulance_row,
+                             ambulance_notify_status=ambulance_notify_status,
+                             ambulance_notify_message=ambulance_notify_message,
                              priority=priority,
                              severity=severity,
                              prediction_score=prediction_score,
@@ -6529,4 +7157,16 @@ if __name__ == '__main__':
         raise SystemExit(0)
 
     init_db()
-    app.run(host='0.0.0.0', port=5001, ssl_context='adhoc', debug=True)
+    host = os.environ.get('HOST', '0.0.0.0')
+    port = int(os.environ.get('PORT', 5001))
+    debug_mode = os.environ.get('FLASK_DEBUG', '1') == '1'
+    use_https = os.environ.get('USE_HTTPS', '0') == '1'
+    ssl_context = 'adhoc' if use_https else None
+
+    if use_https:
+        print('[INFO] Starting with HTTPS (self-signed certificate).')
+        print('[INFO] Browser may show certificate warning unless cert is trusted.')
+    else:
+        print('[INFO] Starting with HTTP (no certificate warning).')
+
+    app.run(host=host, port=port, ssl_context=ssl_context, debug=debug_mode)

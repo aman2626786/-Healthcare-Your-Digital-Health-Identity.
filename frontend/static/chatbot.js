@@ -1,5 +1,5 @@
 /**
- * Chatbot logic for Swasthya Sampark
+ * Chatbot logic for Healthcare
  * Connects to n8n webhook via POST request
  */
 
@@ -16,10 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const WEBHOOK_URL = 'http://localhost:5678/webhook/c9e7ec7e-48c6-46f1-9cc9-986991332820';
     
     // Generate an anonymous session ID so n8n can preserve memory conversation
-    let sessionId = localStorage.getItem('swasthya_chatbot_session_id');
+    let sessionId = localStorage.getItem('healthcare_chatbot_session_id') || localStorage.getItem('swasthya_chatbot_session_id');
     if (!sessionId) {
         sessionId = 'session_' + Math.random().toString(36).substring(2, 15);
-        localStorage.setItem('swasthya_chatbot_session_id', sessionId);
+        localStorage.setItem('healthcare_chatbot_session_id', sessionId);
     }
 
     let isWaitingForResponse = false;
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Add welcome message if chat is empty
             if (messagesContainer.children.length === 0) {
-                appendMessage('bot', 'Hello! I am the Swasthya Sampark AI Assistant. How can I help you today?');
+                appendMessage('bot', 'Hello! I am the Healthcare AI Assistant. How can I help you today?');
             }
         }
     }
@@ -177,3 +177,5 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 });
+
+

@@ -3,10 +3,18 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h1>🏥 Treatment at {{ hospital['name'] }}</h1>
+        <h1>Hospital Treatment at {{ hospital['name'] }}</h1>
         <p class="help-text">Your medical records and visit history at this hospital</p>
+        {% if hospital['abha_connected'] %}
+            <p class="help-text" style="color:#065f46; margin-top:0.35rem;">Verified hospital: ABHA connected</p>
+        {% else %}
+            <p class="help-text" style="color:#9a3412; margin-top:0.35rem;">Verification pending: please check hospital status before critical treatment</p>
+        {% endif %}
     </div>
-    <a href="{{ url_for('user_dashboard') }}" class="btn small">← Back to Dashboard</a>
+    <div class="page-header-actions" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <a href="{{ url_for('hospital_verify', reg_no=hospital['reg_no']) }}" class="btn small primary" target="_blank">Verify Hospital QR Page</a>
+        <a href="{{ url_for('user_dashboard') }}" class="btn small">Back to Dashboard</a>
+    </div>
 </div>
 
 {% if records %}
@@ -35,7 +43,7 @@
 
 <section class="card mt-lg">
     {% set latest = records[0] %}
-    <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.05)); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--primary); margin-bottom: 1.5rem;">
+    <div style="background: linear-gradient(135deg, rgba(15, 118, 110, 0.1), rgba(15, 118, 110, 0.05)); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--primary); margin-bottom: 1.5rem;">
         <h3 style="margin: 0 0 0.5rem 0; color: var(--primary);">📋 Latest Treatment</h3>
         <p style="margin: 0; color: var(--text-light); font-size: 0.95rem;">
             <strong>Date:</strong> {{ latest['date'] }} | 
@@ -199,3 +207,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+
+

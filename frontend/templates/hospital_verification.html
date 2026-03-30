@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}Hospital Verification{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Hospital Verification</h1>
+        <p class="help-text">Scan-based trust check for patients before treatment decisions.</p>
+    </div>
+    <a href="{{ url_for('index') }}" class="btn small">Back to Home</a>
+</div>
+
+<section class="card mt-lg" style="max-width:900px; margin-inline:auto;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+        <div>
+            <h2 style="margin:0;">{{ hospital['name'] }}</h2>
+            <p class="help-text" style="margin:0.4rem 0 0 0;">Registration No: <strong style="font-family:monospace;">{{ hospital['reg_no'] }}</strong></p>
+        </div>
+        {% if is_verified %}
+            <span class="badge" style="background:#ecfdf5; color:#065f46; font-weight:700;">Verified ABHA Connected</span>
+        {% else %}
+            <span class="badge" style="background:#fff7ed; color:#9a3412; font-weight:700;">Not Verified</span>
+        {% endif %}
+    </div>
+
+    <div class="grid stats-grid mt-lg">
+        <div class="card stat-card">
+            <div class="stat-label">Phone</div>
+            <div class="stat-value" style="font-size:1.1rem;">{{ hospital['phone'] or '-' }}</div>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-label">State</div>
+            <div class="stat-value" style="font-size:1.1rem;">{{ hospital['state'] or '-' }}</div>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-label">District</div>
+            <div class="stat-value" style="font-size:1.1rem;">{{ hospital['district'] or '-' }}</div>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-label">Checked On</div>
+            <div class="stat-value" style="font-size:1rem;">{{ verified_on }}</div>
+        </div>
+    </div>
+
+    <div class="card mt-lg" style="background:var(--bg-light);">
+        <h3 style="margin-top:0;">Why this is important</h3>
+        <ul style="margin:0; padding-left:1.1rem;">
+            <li>Patients can avoid untrusted hospitals or fake claims.</li>
+            <li>Emergency treatment decisions become safer and faster.</li>
+            <li>Families get confidence that care is coming from a known platform.</li>
+        </ul>
+    </div>
+
+    {% if not is_verified %}
+    <p class="help-text mt-lg" style="color:#9a3412;">
+        This hospital is currently not marked as ABHA-connected in the platform. Please confirm details before critical treatment.
+    </p>
+    {% endif %}
+</section>
+{% endblock %}

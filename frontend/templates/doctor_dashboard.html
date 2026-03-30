@@ -256,7 +256,7 @@
 
     {% if records %}
     {% set latest = records[0] %}
-    <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.05)); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--primary);">
+    <div style="background: linear-gradient(135deg, rgba(15, 118, 110, 0.1), rgba(15, 118, 110, 0.05)); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--primary);">
         <p class="help-text" style="margin: 0;">
             <strong>Latest Treatment:</strong> {{ latest['date'] }}
             {% if latest['diagnosis'] %}
@@ -476,3 +476,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+
