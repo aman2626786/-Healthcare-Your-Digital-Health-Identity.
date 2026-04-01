@@ -1,0 +1,9 @@
+[build]
+  publish = "netlify"
+
+[[redirects]]
+  from = "/*"
+  to = "https://swasthya-sampark-0tds.onrender.com/:splat"
+  status = 200
+  force = true
+
