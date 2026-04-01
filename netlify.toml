@@ -3,7 +3,6 @@
 
 [[redirects]]
   from = "/*"
-  to = "https://swasthya-sampark-0tds.onrender.com/:splat"
+  to = "https://healthcare-your-digital-health-identity.onrender.com/:splat"
   status = 200
   force = true
-
