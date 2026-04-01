@@ -4,6 +4,7 @@ Werkzeug>=3.0.1
 
 # Database
 # SQLite is included with Python, no package needed
+psycopg2-binary>=2.9.9
 
 # Machine Learning
 numpy>=1.24.3
@@ -30,4 +31,3 @@ python-dotenv>=1.0.0
 
 # Optional: For better performance
 # uWSGI>=2.0.23  # Alternative to gunicorn
-

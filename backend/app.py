@@ -4,6 +4,7 @@ import os
 import uuid
 import sys
 import argparse
+from urllib.parse import urlparse
 try:
     import qrcode
     QRCODE_AVAILABLE = True
@@ -20,6 +21,15 @@ import random
 import warnings
 import re
 import math
+
+try:
+    import psycopg2
+    from psycopg2.extras import DictCursor
+    POSTGRES_DRIVER_AVAILABLE = True
+except ImportError:
+    psycopg2 = None
+    DictCursor = None
+    POSTGRES_DRIVER_AVAILABLE = False
 
 
 def demo_defaults():
@@ -75,6 +85,7 @@ if USE_CONFIG and config:
     QR_FOLDER = config.QR_FOLDER
     MODEL_PATH = config.MODEL_PATH
     EMERGENCY_MODEL_PATH = config.EMERGENCY_MODEL_PATH
+    DATABASE_URL = (getattr(config, 'DATABASE_URL', '') or '').strip()
 else:
     # Fallback to direct configuration (backward compatibility)
     app = Flask(__name__, 
@@ -93,6 +104,126 @@ else:
     MODEL_PATH = os.path.join(BACKEND_DIR, 'pkl', 'svm_health_risk_model.pkl')
     EMERGENCY_MODEL_PATH = os.path.join(BACKEND_DIR, 'pkl', 'Logistic_regression_prediction.pkl')
     app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+    DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
+
+
+def _normalize_database_url(raw_url):
+    if not raw_url:
+        return ''
+    if raw_url.startswith('postgres://'):
+        return raw_url.replace('postgres://', 'postgresql://', 1)
+    return raw_url
+
+
+NORMALIZED_DATABASE_URL = _normalize_database_url(DATABASE_URL)
+USE_POSTGRES = NORMALIZED_DATABASE_URL.startswith('postgresql://')
+
+
+def _adapt_sql_for_postgres(sql):
+    transformed = sql
+
+    # SQLite DDL compatibility
+    transformed = re.sub(r'\bAUTOINCREMENT\b', '', transformed, flags=re.IGNORECASE)
+    transformed = re.sub(
+        r'\bid\s+INTEGER\s+PRIMARY\s+KEY\b',
+        'id SERIAL PRIMARY KEY',
+        transformed,
+        flags=re.IGNORECASE,
+    )
+
+    # SQLite function compatibility
+    transformed = transformed.replace('SUBSTR(contact_phone, -4)', 'RIGHT(contact_phone, 4)')
+
+    # SQLite INSERT OR IGNORE compatibility
+    if re.search(r'^\s*INSERT\s+OR\s+IGNORE\s+INTO\b', transformed, flags=re.IGNORECASE):
+        transformed = re.sub(
+            r'^\s*INSERT\s+OR\s+IGNORE\s+INTO\b',
+            'INSERT INTO',
+            transformed,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+        if 'ON CONFLICT' not in transformed.upper():
+            transformed = transformed.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
+
+    # SQLite placeholder compatibility
+    transformed = transformed.replace('?', '%s')
+    return transformed
+
+
+class PostgresCursorAdapter:
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self.lastrowid = None
+
+    def execute(self, sql, params=None):
+        transformed_sql = _adapt_sql_for_postgres(sql)
+        try:
+            if params is None:
+                self._cursor.execute(transformed_sql)
+            else:
+                self._cursor.execute(transformed_sql, params)
+
+            self.lastrowid = None
+            if re.match(r'^\s*INSERT\s+INTO\s+', transformed_sql, flags=re.IGNORECASE):
+                table_match = re.search(r'^\s*INSERT\s+INTO\s+([a-zA-Z_][\w]*)', transformed_sql, flags=re.IGNORECASE)
+                if table_match:
+                    table_name = table_match.group(1)
+                    try:
+                        self._cursor.execute(
+                            "SELECT currval(pg_get_serial_sequence(%s, 'id'))",
+                            (table_name,),
+                        )
+                        row = self._cursor.fetchone()
+                        self.lastrowid = row[0] if row else None
+                    except Exception:
+                        # Can fail when ON CONFLICT DO NOTHING skipped insertion.
+                        self.lastrowid = None
+        except Exception as exc:
+            raise sqlite3.OperationalError(str(exc)) from exc
+        return self
+
+    def executemany(self, sql, seq_of_params):
+        transformed_sql = _adapt_sql_for_postgres(sql)
+        try:
+            self._cursor.executemany(transformed_sql, seq_of_params)
+        except Exception as exc:
+            raise sqlite3.OperationalError(str(exc)) from exc
+        return self
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    def close(self):
+        return self._cursor.close()
+
+
+class PostgresConnectionAdapter:
+    def __init__(self, conn):
+        self._conn = conn
+        self.row_factory = None
+
+    def cursor(self):
+        return PostgresCursorAdapter(self._conn.cursor(cursor_factory=DictCursor))
+
+    def commit(self):
+        return self._conn.commit()
+
+    def rollback(self):
+        return self._conn.rollback()
+
+    def close(self):
+        return self._conn.close()
 
 N8N_AMBULANCE_WEBHOOK_URL = os.environ.get('N8N_AMBULANCE_WEBHOOK_URL', '').strip()
 
@@ -263,6 +394,19 @@ except Exception as e:
 
 # Helper function to get DB connection
 def get_db_connection():
+    if USE_POSTGRES:
+        if not POSTGRES_DRIVER_AVAILABLE:
+            raise RuntimeError(
+                "DATABASE_URL is PostgreSQL but psycopg2 is not installed. "
+                "Install dependency: psycopg2-binary>=2.9.9"
+            )
+        connect_kwargs = {"dsn": NORMALIZED_DATABASE_URL}
+        parsed = urlparse(NORMALIZED_DATABASE_URL)
+        if parsed.scheme.startswith('postgresql') and 'sslmode=' not in (parsed.query or ''):
+            connect_kwargs["sslmode"] = os.environ.get('PGSSLMODE', 'require')
+        conn = psycopg2.connect(**connect_kwargs)
+        return PostgresConnectionAdapter(conn)
+
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -271,13 +415,16 @@ def get_db_connection():
 # Initialize database with basic schema
 def init_db():
     """Initialize database and create all tables if they don't exist"""
-    # Ensure database directory exists
-    db_dir = os.path.dirname(DB_PATH)
-    if db_dir and not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
-        print(f"[INFO] Created database directory: {db_dir}")
-    
-    print(f"[INFO] Initializing database at: {DB_PATH}")
+    # Ensure local SQLite database directory exists
+    if not USE_POSTGRES:
+        db_dir = os.path.dirname(DB_PATH)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+            print(f"[INFO] Created database directory: {db_dir}")
+        print(f"[INFO] Initializing SQLite database at: {DB_PATH}")
+    else:
+        parsed = urlparse(NORMALIZED_DATABASE_URL)
+        print(f"[INFO] Initializing PostgreSQL database at: {parsed.hostname}:{parsed.port or 5432}/{parsed.path.lstrip('/')}")
     try:
         conn = get_db_connection()
         cur = conn.cursor()
